@@ -19,29 +19,26 @@ public class Client implements Runnable {
 
     @Override
     public void run() {
-        Socket socket = null;
-        try {
-            socket = new Socket(InetAddress.getByName(null), remotePortNum);
 
+        try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+        {
             // close out and in
             // to do ...
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream()));
+            try (PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                 BufferedReader in = new BufferedReader(
+                         new InputStreamReader(socket.getInputStream()));)
+            {
+                String inputLine, outputLine;
 
-            String inputLine, outputLine;
+                outputLine = "Hello, I am Client!";
+                out.println(outputLine);
 
-            outputLine = "Hello, I am Client!";
-            out.println(outputLine);
-
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Client: received message from the server: " + inputLine);
+                while ((inputLine = in.readLine()) != null) {
+                    System.out.println("Client: received message from the server: " + inputLine);
+                }
             }
-
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-
         }
     }
 

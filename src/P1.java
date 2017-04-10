@@ -1,6 +1,9 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Created by jasonzhang on 4/7/17.
@@ -10,20 +13,10 @@ public class P1 {
     // to do ...
 
     public static void main(String args[]) throws Exception {
-        // assign ip
+        //
         String ipAddr = "127.0.0.1";
         int serverPortNum;
-
-        // create directories
-        // to do ...
-        // host info: /tmp/<userlogin>/linda/<hostname>/nets
-        // tuple info: /tmp/<userlogin>/linda/<hostname>/tuples
-
-
-        // assign host name
-        // to do ...
-        // store the host name in nets folder
-        String hostName = "";
+        String hostName;
 
         // assign host name
         // to do ...
@@ -33,21 +26,24 @@ public class P1 {
         }
 
         hostName = args[0];
-        serverPortNum = Integer.parseInt(args[1]);
+
+        // create directories
+        // to do ...
+        // nets info: /tmp/<userlogin>/linda/<hostname>/nets
+        // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
+        String infoDir = "/tmp/szhang/linda/" + hostName + "/";
+        String netsFile = "nets.txt";
+        String tuplesFile = "tuples.txt";
+        new File(infoDir + netsFile).mkdirs();
+        new File(infoDir + tuplesFile).mkdirs();
 
         // set up the server
-        (new Thread(new Server(ipAddr, serverPortNum))).start();
-        System.out.println("The server started ...");
-
-        // print host ip and port
-        System.out.println(ipAddr + " at port number: " + serverPortNum);
+        (new Thread(new Server())).start();
+        System.out.println("The server named " + hostName + " started ...");
 
         // read user input
-        BufferedReader br = null;
-
-        try {
-            br = new BufferedReader(new InputStreamReader(System.in));
-
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in));)
+        {
             while(true) {
                 System.out.print("linda> ");
                 String input = br.readLine();
@@ -65,7 +61,7 @@ public class P1 {
                     (new Thread(new Client(remoteIpAddr, remotePortNum))).start();
                 }
 
-                if ("Exit".equals(input)) {
+                if ("exit".equals(input)) {
                     System.out.println("Exit linda!");
                     System.exit(0);
                 }
@@ -74,16 +70,6 @@ public class P1 {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
-
-
     }
 }

@@ -16,47 +16,26 @@ public class Server implements Runnable {
     private String ipAddr;
     private int portNum;
 
-    public Server(String ipAddr, int portNum) {
-        this.ipAddr = ipAddr;
-        this.portNum = portNum;
-    }
-
     @Override
     public void run() {
-        ServerSocket serverSocket = null;
 
-        try {
-            serverSocket = new ServerSocket(portNum, 0, InetAddress.getByName(null));
-            Socket clientSocket = serverSocket.accept();
+        try (ServerSocket serverSocket = new ServerSocket(0);)
+        {
+            // assign ip and port number
+            ipAddr = InetAddress.getLocalHost().getHostAddress();
+            portNum = serverSocket.getLocalPort();
 
-            // close out and in
-            // to do ...
-            PrintWriter out =
-                    new PrintWriter(clientSocket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(clientSocket.getInputStream()));
+            // print host ip and port
+            System.out.println(ipAddr.toString() + " at port number: " + portNum);
 
-            String inputLine, outputLine;
-            outputLine = "Hello, I am Server";
-
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Server: received message from the client: " + inputLine);
-                out.println(outputLine);
+            // listen on the port
+            while (true) {
+                (new Thread(new ServerWorker(serverSocket.accept()))).start();
             }
 
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            if (serverSocket != null) {
-                try {
-                    serverSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
-
-
     }
 
 
