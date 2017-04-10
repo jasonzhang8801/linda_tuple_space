@@ -5,25 +5,43 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by jasonzhang on 4/7/17.
  */
 public class Server implements Runnable {
+
     // refactor
     // to do ...
-
+    public static List<NetsEntry> netsList;
     private String ipAddr;
     private int portNum;
+    private String hostName;
+
+    public Server(String hostName) {
+        this.hostName = hostName;
+    }
 
     @Override
     public void run() {
+        // load the nets info
+        netsList = new ArrayList<>();
 
         try (ServerSocket serverSocket = new ServerSocket(0);)
         {
             // assign ip and port number
             ipAddr = InetAddress.getLocalHost().getHostAddress();
             portNum = serverSocket.getLocalPort();
+
+            // add the local host into the nets list
+            NetsEntry localHostInfo = new NetsEntry();
+            localHostInfo.hostName = hostName;
+            localHostInfo.ipAddr = ipAddr;
+            localHostInfo.portNum = portNum;
+            netsList.add(localHostInfo);
 
             // print host ip and port
             System.out.println(ipAddr.toString() + " at port number: " + portNum);
@@ -36,10 +54,5 @@ public class Server implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-
-    public static void main(String args[]) {
-
     }
 }
