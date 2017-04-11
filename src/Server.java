@@ -35,6 +35,7 @@ public class Server implements Runnable {
 
             // add command handler
             NetsEntry localHostInfo = new NetsEntry();
+            localHostInfo.hostId = 0;
             localHostInfo.hostName = hostName;
             localHostInfo.ipAddr = ipAddr;
             localHostInfo.portNum = portNum;

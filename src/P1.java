@@ -14,6 +14,8 @@ public class P1 {
     // to do ...
     public static ConcurrentHashMap<Integer, NetsEntry> netsMap = null;
 
+    @SuppressWarnings("unchecked")
+    // suppress compiler warning when hashmap assignment
     public static void main(String args[]) {
 
         // assign host name
@@ -120,9 +122,12 @@ public class P1 {
                                     try {
                                         if ((receivedMessage = (Message) in.readObject()) != null) {
                                             ConcurrentHashMap<Integer, NetsEntry> remoteNetsMap = receivedMessage.netsMap;
-                                            listOfReceivedNetsMap.add(remoteNetsMap);
-                                            System.out.println("Client: recevied message " + receivedMessage.command);
-                                            System.out.println("Client: the size of list is " + listOfReceivedNetsMap.size());
+                                            if (receivedMessage.success != true) {
+                                                System.out.println("Error: remoted server failed to send back its nets infomation");
+                                            } else if (receivedMessage.command.equals("add")) {
+                                                listOfReceivedNetsMap.add(remoteNetsMap);
+                                                System.out.println("Client: recevied message " + receivedMessage.command);
+                                            }
                                         }
                                     } catch (ClassNotFoundException e) {
                                         e.printStackTrace();
@@ -135,6 +140,7 @@ public class P1 {
                         }
 
                         // merge the local netsMap with netsMap from the remote servers
+                        // check if received all nets info from remote servers
                         if (numOfHost != listOfReceivedNetsMap.size()) {
                             System.out.println("Error: expected to connect with " + numOfHost + " remote hosts, but only connected with " + listOfReceivedNetsMap.size());
                         } else {
@@ -142,14 +148,63 @@ public class P1 {
                             // assign id 0 to local host as master
                             for (int i = 0; i < numOfHost; i++) {
                                 int remoteId = i + 1;
-                                netsMap.put(remoteId, listOfReceivedNetsMap.get(i).get(0));
+                                NetsEntry remoteNetsEntry = listOfReceivedNetsMap.get(i).get(0);
+                                remoteNetsEntry.hostId = remoteId;
+                                netsMap.put(remoteId, remoteNetsEntry);
+                            }
+
+                            // test only
+                            // print out the nets map
+//                            for (int id : P1.netsMap.keySet()) {
+//                                System.out.println("Merged nets");
+//                                System.out.println("key: " + id + " hostName: " + P1.netsMap.get(id).hostName + " hostId: " + P1.netsMap.get(id).hostId);
+//                            }
+
+                            // send the merged nets back to remote servers
+                            for (int id : netsMap.keySet()) {
+                                if (id != 0) {
+                                    String remoteIpAddr = netsMap.get(id).ipAddr;
+                                    int remotePortNum = netsMap.get(id).portNum;
+
+                                    try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                                    {
+
+                                        try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                        )
+                                        {
+                                            // construct the merge message with add
+                                            Message sendMessage = new Message();
+                                            sendMessage.command = "merge";
+                                            sendMessage.netsMap = P1.netsMap;
+
+                                            // send the message to remote server
+                                            out.writeObject(sendMessage);
+
+                                            // construct the received object
+                                            Message receivedMessage = null;
+
+                                            try {
+                                                if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                    if (receivedMessage.command.equals("merge")  && receivedMessage.success == true) {
+                                                        System.out.println("Server: successfully add the host with IP: " + remoteIpAddr
+                                                                + " port: " + remotePortNum );
+                                                    } else {
+                                                        System.out.println("Error: failed to add host with IP: " + remoteIpAddr
+                                                                + " port: " + remotePortNum );
+                                                    }
+                                                }
+                                            } catch (ClassNotFoundException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
                             }
                         }
 
-                        for (Integer key : netsMap.keySet()) {
-                            System.out.println("key: " + key + " hostName: " + netsMap.get(key).hostName);
-                        }
-                        
                         state = "idle";
                         break;
                     case "delete":

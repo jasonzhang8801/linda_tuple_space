@@ -13,6 +13,7 @@ public class ServerWorker implements Runnable {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void run() {
 
         try (ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -30,11 +31,23 @@ public class ServerWorker implements Runnable {
                     switch (command.toLowerCase()) {
                         case "add":
                             receivedMessage.netsMap = P1.netsMap;
+                            receivedMessage.success = true;
                             out.writeObject(receivedMessage);
                             System.out.println("Server: send message " + receivedMessage.command);
                             break;
                         case "merge":
+                            P1.netsMap = receivedMessage.netsMap;
 
+                            // test only
+                            // print out the nets map
+//                            for (int id : P1.netsMap.keySet()) {
+//                                System.out.println("Merged nets");
+//                                System.out.println("key: " + id + " hostName: " + P1.netsMap.get(id).hostName  + " hostId: " + P1.netsMap.get(id).hostId);
+//                            }
+
+                            receivedMessage.success = true;
+                            out.writeObject(receivedMessage);
+                            System.out.println("Server: send message " + receivedMessage.command);
                             break;
                         case "delete":
                             break;
