@@ -1,7 +1,4 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 
 /**
@@ -18,22 +15,63 @@ public class ServerWorker implements Runnable {
     @Override
     public void run() {
 
-    //  close out and in
-    //  to do ...
-        try (PrintWriter out =
-                     new PrintWriter(clientSocket.getOutputStream(), true);
-             BufferedReader in = new BufferedReader(
-                     new InputStreamReader(clientSocket.getInputStream()));)
+        try (ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+        )
         {
-            String inputLine, outputLine;
-            outputLine = "Hello, I am Server";
+            // construct received message
+            Message receivedMessage = null;
 
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Server: received message from the client: " + inputLine);
-                out.println(outputLine);
+            try {
+                if ((receivedMessage = (Message)in.readObject()) != null) {
+                    // check which command the server received
+                    String command = receivedMessage.command;
+
+                    switch (command.toLowerCase()) {
+                        case "add":
+                            receivedMessage.netsMap = P1.netsMap;
+                            out.writeObject(receivedMessage);
+                            System.out.println("Server: send message " + receivedMessage.command);
+                            break;
+                        case "merge":
+
+                            break;
+                        case "delete":
+                            break;
+                        case "in":
+                            break;
+                        case "out":
+                            break;
+                        case "rd":
+                            break;
+                        default:
+                            System.out.println("Server: received unknown command");
+                            break;
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+
+//        try (PrintWriter out =
+//                     new PrintWriter(clientSocket.getOutputStream(), true);
+//             BufferedReader in = new BufferedReader(
+//                     new InputStreamReader(clientSocket.getInputStream()));)
+//        {
+//            String inputLine, outputLine;
+//            outputLine = "Hello, I am Server";
+//
+//            while ((inputLine = in.readLine()) != null) {
+//                System.out.println("Server: received message from the client: " + inputLine);
+//                out.println(outputLine);
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
     }
 }

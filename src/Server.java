@@ -16,7 +16,6 @@ public class Server implements Runnable {
 
     // refactor
     // to do ...
-    public static List<NetsEntry> netsList;
     private String ipAddr;
     private int portNum;
     private String hostName;
@@ -27,8 +26,6 @@ public class Server implements Runnable {
 
     @Override
     public void run() {
-        // load the nets info
-        netsList = new ArrayList<>();
 
         try (ServerSocket serverSocket = new ServerSocket(0);)
         {
@@ -36,12 +33,12 @@ public class Server implements Runnable {
             ipAddr = InetAddress.getLocalHost().getHostAddress();
             portNum = serverSocket.getLocalPort();
 
-            // add the local host into the nets list
+            // add command handler
             NetsEntry localHostInfo = new NetsEntry();
             localHostInfo.hostName = hostName;
             localHostInfo.ipAddr = ipAddr;
             localHostInfo.portNum = portNum;
-            netsList.add(localHostInfo);
+            P1.netsMap.put(0, localHostInfo);
 
             // print host ip and port
             System.out.println(ipAddr.toString() + " at port number: " + portNum);
