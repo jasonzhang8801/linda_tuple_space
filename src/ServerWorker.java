@@ -54,6 +54,7 @@ public class ServerWorker implements Runnable {
                         case "in":
                             break;
                         case "out":
+
                             break;
                         case "rd":
                             break;
@@ -69,22 +70,5 @@ public class ServerWorker implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
-//        try (PrintWriter out =
-//                     new PrintWriter(clientSocket.getOutputStream(), true);
-//             BufferedReader in = new BufferedReader(
-//                     new InputStreamReader(clientSocket.getInputStream()));)
-//        {
-//            String inputLine, outputLine;
-//            outputLine = "Hello, I am Server";
-//
-//            while ((inputLine = in.readLine()) != null) {
-//                System.out.println("Server: received message from the client: " + inputLine);
-//                out.println(outputLine);
-//            }
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
     }
 }

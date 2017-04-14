@@ -41,8 +41,9 @@ public class Server implements Runnable {
             localHostInfo.portNum = portNum;
             P1.netsMap.put(0, localHostInfo);
 
-            // print host ip and port
-            System.out.println(ipAddr.toString() + " at port number: " + portNum);
+            // assign the ip and port back to P1 for print on the console
+            P1.ipAddr = ipAddr;
+            P1.portNum = portNum;
 
             // listen on the port
             while (true) {
