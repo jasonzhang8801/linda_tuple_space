@@ -91,6 +91,8 @@ public class Client {
 
                                     // send the message to remote server
                                     out.writeObject(sendMessage);
+                                    System.out.println("Client: send the message with command add to the remote host with IP "
+                                            + remoteIpAddr);
 
                                     // construct the received object
                                     Message receivedMessage = null;
@@ -102,7 +104,8 @@ public class Client {
                                                 System.out.println("Error: remoted server failed to send back its nets infomation");
                                             } else if (receivedMessage.command.equals("add")) {
                                                 listOfReceivedNetsMap.add(remoteNetsMap);
-                                                System.out.println("Client: received message with remote host's nets map");
+                                                System.out.println("Client: received message with nets map from the remote host"
+                                                        + remoteIpAddr);
                                             }
                                         }
                                     } catch (ClassNotFoundException e) {
@@ -157,7 +160,8 @@ public class Client {
 
                                             // send the message to remote server
                                             out.writeObject(sendMessage);
-                                            System.out.println("Client: send back the message with updated nets map");
+                                            System.out.println("Client: send back the message with updated nets map to remote host with IP "
+                                                    + remoteIpAddr);
 
                                             // construct the received object
                                             Message receivedMessage = null;

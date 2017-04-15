@@ -57,7 +57,7 @@ public abstract class Utility {
                 case "add":
                     // initialize the field: remote host information
                     parserEntry.remoteHostsInfo = new ArrayList<>();
-
+                    
                     // store the valid remote host info into remoteHostInfo
                     // e.g. "hostname, 123.456.78.90, 1234"
                     int start_pos = 0;
@@ -168,6 +168,23 @@ public abstract class Utility {
 //                        System.out.println("class name is " + className);
 //                    }
 
+                    break;
+                case "rd":
+                    // initialize the field: tuple
+                    parserEntry.tuple = new ArrayList<>();
+
+                    // get the content between the parentheses
+                    pattern = Pattern.compile("^\\((.*)\\)$");
+                    matcher = pattern.matcher(withoutCommandSubstr);
+
+                    if (!matcher.find()) {
+                        System.out.println("Error: invalid tuple");
+                        System.out.println("Please type command \"help\" to get more details");
+                    }
+                    String content = matcher.group(1).trim();
+
+                    // assume no "," in the tuple
+                    String[] splitted = content.split(",");
                     break;
                 default:
                     // no valid command name
