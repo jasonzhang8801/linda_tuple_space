@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -10,7 +11,11 @@ public class P1 {
     // refactor
     // to do ...
     public static ConcurrentHashMap<Integer, NetsEntry> netsMap = null;
-//    public static ConcurrentHashMap<String, List>
+    public static ConcurrentHashMap<String, List<TupleSpaceEntry>> tupleSpace = new ConcurrentHashMap<>();
+
+    // the local directory for nets map and tuple space
+    public static String netsMapDir;
+    public static String tupleSpaceDir;
 
     public static String ipAddr = null;
     public static int portNum = -1;
@@ -51,11 +56,26 @@ public class P1 {
         // create directories
         // nets info: /tmp/<userlogin>/linda/<hostname>/nets
         // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
-        String infoDir = "/tmp/szhang/linda/" + hostName + "/";
+        String inforDir = "/tmp/szhang/linda/" + hostName + "/";
         String netsFile = "nets.txt";
         String tuplesFile = "tuples.txt";
-        new File(infoDir + netsFile).mkdirs();
-        new File(infoDir + tuplesFile).mkdirs();
+        new File(inforDir).mkdirs();
+        netsMapDir = inforDir + netsFile;
+        tupleSpaceDir = inforDir + tuplesFile;
+
+        try {
+            new File(netsMapDir).createNewFile();
+            new File(tupleSpaceDir).createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+//        // store a empty tuple space into the file
+//        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
+//            objOut.writeObject(new ConcurrentHashMap<String,List<TupleSpaceEntry>>());
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
         // print host ip and port
         while (ipAddr == null || portNum == -1) {

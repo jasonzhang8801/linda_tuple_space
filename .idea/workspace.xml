@@ -2,19 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="3e5ed195-6670-4995-a61b-94595b2ee03f" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/ParserEntry.java" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/TupleElementType.java" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/TupleSpaceEntry.java" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/Utility.java" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/src/TupleEntry.java" afterPath="" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/out/production/linda_tuple_space/Client.class" afterPath="$PROJECT_DIR$/out/production/linda_tuple_space/Client.class" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/out/production/linda_tuple_space/P1.class" afterPath="$PROJECT_DIR$/out/production/linda_tuple_space/P1.class" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/out/production/linda_tuple_space/Server.class" afterPath="$PROJECT_DIR$/out/production/linda_tuple_space/Server.class" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/Tuple.java" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Client.java" afterPath="$PROJECT_DIR$/src/Client.java" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/P1.java" afterPath="$PROJECT_DIR$/src/P1.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Server.java" afterPath="$PROJECT_DIR$/src/Server.java" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/ServerWorker.java" afterPath="$PROJECT_DIR$/src/ServerWorker.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/TupleSpaceEntry.java" afterPath="$PROJECT_DIR$/src/TupleSpaceEntry.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Utility.java" afterPath="$PROJECT_DIR$/src/Utility.java" />
     </list>
     <ignored path="linda_tuple_space.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -37,14 +31,14 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="P1.java" pinned="false" current-in-tab="true">
+      <file leaf-file-name="P1.java" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/P1.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.35779816">
-              <caret line="13" column="0" selection-start-line="13" selection-start-column="0" selection-end-line="13" selection-end-column="0" />
+            <state vertical-scroll-proportion="0.0">
+              <caret line="13" column="106" selection-start-line="13" selection-start-column="106" selection-end-line="13" selection-end-column="106" />
               <folding>
                 <element signature="imports" expanded="true" />
-                <element signature="e#431#461#0" expanded="true" />
+                <element signature="e#643#673#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -54,8 +48,11 @@
         <entry file="file://$PROJECT_DIR$/src/TupleSpaceEntry.java">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="3" column="28" selection-start-line="3" selection-start-column="28" selection-end-line="3" selection-end-column="28" />
-              <folding />
+              <caret line="16" column="30" selection-start-line="16" selection-start-column="30" selection-end-line="16" selection-end-column="30" />
+              <folding>
+                <element signature="n#!!doc" expanded="true" />
+                <element signature="imports" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -63,10 +60,23 @@
       <file leaf-file-name="Utility.java" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Utility.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-7.5185184">
-              <caret line="335" column="0" selection-start-line="335" selection-start-column="2" selection-end-line="341" selection-end-column="51" />
+            <state vertical-scroll-proportion="-3.5925925">
+              <caret line="109" column="65" selection-start-line="109" selection-start-column="65" selection-end-line="109" selection-end-column="65" />
               <folding>
                 <element signature="imports" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="ServerWorker.java" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/ServerWorker.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="1.0275229">
+              <caret line="123" column="118" selection-start-line="123" selection-start-column="118" selection-end-line="123" selection-end-column="119" />
+              <folding>
+                <element signature="imports" expanded="true" />
+                <element signature="e#383#413#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -75,8 +85,8 @@
       <file leaf-file-name="Client.java" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Client.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-8.333333">
-              <caret line="192" column="70" selection-start-line="192" selection-start-column="70" selection-end-line="192" selection-end-column="70" />
+            <state vertical-scroll-proportion="-10.0">
+              <caret line="231" column="111" selection-start-line="231" selection-start-column="111" selection-end-line="231" selection-end-column="111" />
               <folding>
                 <element signature="imports" expanded="true" />
               </folding>
@@ -109,12 +119,14 @@
         <option value="$PROJECT_DIR$/src/NetsEntry.java" />
         <option value="$PROJECT_DIR$/src/TupleElementType.java" />
         <option value="$PROJECT_DIR$/src/Server.java" />
-        <option value="$PROJECT_DIR$/src/ServerWorker.java" />
         <option value="$PROJECT_DIR$/src/ParserEntry.java" />
-        <option value="$PROJECT_DIR$/src/Client.java" />
-        <option value="$PROJECT_DIR$/src/Utility.java" />
         <option value="$PROJECT_DIR$/src/TupleEntry.java" />
+        <option value="$PROJECT_DIR$/src/Tuple.java" />
+        <option value="$PROJECT_DIR$/src/TupleSpaceEntry.java" />
+        <option value="$PROJECT_DIR$/src/Utility.java" />
         <option value="$PROJECT_DIR$/src/P1.java" />
+        <option value="$PROJECT_DIR$/src/Client.java" />
+        <option value="$PROJECT_DIR$/src/ServerWorker.java" />
       </list>
     </option>
   </component>
@@ -692,12 +704,12 @@
       <option name="number" value="Default" />
       <updated>1491598815884</updated>
       <workItem from="1491598821591" duration="29083000" />
-      <workItem from="1491846539963" duration="55388000" />
+      <workItem from="1491846539963" duration="74012000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="84471000" />
+    <option name="totallyTimeSpent" value="103095000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="0" width="1440" height="900" extended-state="0" />
@@ -756,7 +768,7 @@
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#431#461#0" expanded="true" />
+            <element signature="e#643#673#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -785,7 +797,7 @@
           <caret line="30" column="45" selection-start-line="30" selection-start-column="35" selection-end-line="30" selection-end-column="45" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#284#314#0" expanded="true" />
+            <element signature="e#383#413#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -807,34 +819,6 @@
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Server.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.18181819">
-          <caret line="10" column="0" selection-start-line="10" selection-start-column="0" selection-end-line="10" selection-end-column="0" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/ServerWorker.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="56" column="0" selection-start-line="56" selection-start-column="0" selection-end-line="56" selection-end-column="0" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/NetsEntry.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="10" column="1" selection-start-line="10" selection-start-column="1" selection-end-line="10" selection-end-column="1" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -872,22 +856,49 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Utility.java">
+    <entry file="file://$PROJECT_DIR$/src/Server.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-7.5185184">
-          <caret line="335" column="0" selection-start-line="335" selection-start-column="2" selection-end-line="341" selection-end-column="51" />
+        <state vertical-scroll-proportion="-0.26605505">
+          <caret line="14" column="13" selection-start-line="14" selection-start-column="13" selection-end-line="14" selection-end-column="13" />
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Client.java">
+    <entry file="file://$PROJECT_DIR$/src/Tuple.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-8.333333">
-          <caret line="192" column="70" selection-start-line="192" selection-start-column="70" selection-end-line="192" selection-end-column="70" />
+        <state vertical-scroll-proportion="0.08256881">
+          <caret line="3" column="10" selection-start-line="3" selection-start-column="10" selection-end-line="3" selection-end-column="10" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/NetsEntry.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.27522936">
+          <caret line="10" column="1" selection-start-line="10" selection-start-column="1" selection-end-line="10" selection-end-column="1" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Utility.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="-3.5925925">
+          <caret line="109" column="65" selection-start-line="109" selection-start-column="65" selection-end-line="109" selection-end-column="65" />
           <folding>
             <element signature="imports" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/P1.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="13" column="106" selection-start-line="13" selection-start-column="106" selection-end-line="13" selection-end-column="106" />
+          <folding>
+            <element signature="imports" expanded="true" />
+            <element signature="e#643#673#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -895,18 +906,31 @@
     <entry file="file://$PROJECT_DIR$/src/TupleSpaceEntry.java">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
-          <caret line="3" column="28" selection-start-line="3" selection-start-column="28" selection-end-line="3" selection-end-column="28" />
-          <folding />
+          <caret line="16" column="30" selection-start-line="16" selection-start-column="30" selection-end-line="16" selection-end-column="30" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <element signature="imports" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/P1.java">
+    <entry file="file://$PROJECT_DIR$/src/Client.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.35779816">
-          <caret line="13" column="0" selection-start-line="13" selection-start-column="0" selection-end-line="13" selection-end-column="0" />
+        <state vertical-scroll-proportion="-10.0">
+          <caret line="231" column="111" selection-start-line="231" selection-start-column="111" selection-end-line="231" selection-end-column="111" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#431#461#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/ServerWorker.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="1.0275229">
+          <caret line="123" column="118" selection-start-line="123" selection-start-column="118" selection-end-line="123" selection-end-column="119" />
+          <folding>
+            <element signature="imports" expanded="true" />
+            <element signature="e#383#413#0" expanded="true" />
           </folding>
         </state>
       </provider>

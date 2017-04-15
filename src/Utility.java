@@ -108,7 +108,6 @@ public abstract class Utility {
 
                             if (matcher.find() && (Integer.parseInt(matcher.group(1)) >= 1024 && Integer.parseInt(matcher.group(1)) <= 49151)) {
                                 remotePortNum = matcher.group(1);
-                                System.out.println(remotePortNum);
                             } else {
                                 System.out.println("Error: invalid host port");
                                 System.out.println("Help: valid port number should be between 1024 and 49151, inclusive");
@@ -142,7 +141,6 @@ public abstract class Utility {
                         System.out.println("Please type command \"help\" to get more details");
                     }
                     String content = matcher.group(1).trim();
-                    System.out.println("content is :" + content);
 
                     // assume no "," in the tuple
                     String[] splitted = content.split(",");
@@ -287,7 +285,7 @@ public abstract class Utility {
             String hex = Character.toString(hashString.charAt(i));
             sum += Integer.parseInt(hex, 16);
         }
-        System.out.println("sum: " + sum);
+//        System.out.println("sum: " + sum);
         hostId = sum % numOfHost;
 
 

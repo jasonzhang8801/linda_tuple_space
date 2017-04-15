@@ -18,6 +18,7 @@ public class Client {
         {
             String state = "idle";
             ParserEntry parserEntry = null;
+            int numOfHost = -1;
 
             while(true) {
                 if (state == null) {
@@ -57,7 +58,14 @@ public class Client {
                         List<String> listOfHost = parserEntry.remoteHostsInfo;
 
                         // num of host
-                        int numOfHost = listOfHost.size() / 2;
+                        numOfHost = listOfHost.size() / 2;
+                        if (numOfHost <= 0) {
+                            System.out.println("System error: the number of host should be larger than zero");
+                            System.out.println("Help: please use command \"add\" to add more hosts");
+                            state = "idle";
+                            break;
+                        }
+
                         int count = 0;
 
                         // construct the NetsEntry list
@@ -94,7 +102,7 @@ public class Client {
                                                 System.out.println("Error: remoted server failed to send back its nets infomation");
                                             } else if (receivedMessage.command.equals("add")) {
                                                 listOfReceivedNetsMap.add(remoteNetsMap);
-                                                System.out.println("Client: recevied message " + receivedMessage.command);
+                                                System.out.println("Client: received message with remote host's nets map");
                                             }
                                         }
                                     } catch (ClassNotFoundException e) {
@@ -121,6 +129,7 @@ public class Client {
                                 P1.netsMap.put(remoteId, remoteNetsEntry);
                             }
 
+                            System.out.println("Client: successfully merge the nets map");
                             // test only
                             // print out the nets map
 //                            for (int id : P1.netsMap.keySet()) {
@@ -148,6 +157,7 @@ public class Client {
 
                                             // send the message to remote server
                                             out.writeObject(sendMessage);
+                                            System.out.println("Client: send back the message with updated nets map");
 
                                             // construct the received object
                                             Message receivedMessage = null;
@@ -155,7 +165,7 @@ public class Client {
                                             try {
                                                 if ((receivedMessage = (Message) in.readObject()) != null) {
                                                     if (receivedMessage.command.equals("merge")  && receivedMessage.success == true) {
-                                                        System.out.println("Server: successfully add the host with IP: " + remoteIpAddr
+                                                        System.out.println("Client: successfully add the host with IP: " + remoteIpAddr
                                                                 + " port: " + remotePortNum );
                                                     } else {
                                                         System.out.println("Error: failed to add host with IP: " + remoteIpAddr
@@ -187,13 +197,24 @@ public class Client {
                         // construct the tuple
                         List<Object> tuple = parserEntry.tuple;
 
+                        // check the number of host
+                        if (P1.netsMap.size() <= 0) {
+                            System.out.println("System error: the number of host should be larger than zero");
+                            System.out.println("Help: please use command \"add\" to add more hosts");
+                            state = "idle";
+                            break;
+                        }
+
                         // hash the tuple to get the host information
-                        // test only
-                        String remoteIpAddr = P1.netsMap.get(1).ipAddr;
-                        int remotePortNum = P1.netsMap.get(1).portNum;
+                        int hostId = Utility.hashToId(tuple, P1.netsMap.size());
+//                        System.out.println("host id is " + hostId);
+//                        System.out.println("host name is " + P1.netsMap.get(hostId).hostName
+//                                + "host ip is " + P1.netsMap.get(hostId).ipAddr
+//                                + "host port is " + P1.netsMap.get(hostId).portNum);
+                        String remoteIpAddr = P1.netsMap.get(hostId).ipAddr;
+                        int remotePortNum = P1.netsMap.get(hostId).portNum;
 
-                        //
-
+                        // connect to the remote host
                         try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
                         {
 
@@ -208,6 +229,7 @@ public class Client {
 
                                 // send the message to remote server
                                 out.writeObject(sendMessage);
+                                System.out.println("Client: send the tuple to the host with IP " + remoteIpAddr);
 
                                 // construct the received object
                                 Message receivedMessage = null;
@@ -217,8 +239,7 @@ public class Client {
                                         if (receivedMessage.success != true) {
                                             System.out.println("Error: remoted server failed to put the given tuple");
                                         } else if (receivedMessage.command.equals("out")) {
-                                            System.out.println("Client: recevied message " + receivedMessage.command);
-                                            System.out.println("Client: remoted server put the given tuple successfully");
+                                            System.out.println("put tuple " + receivedMessage.tuple.toString() + " on " + remoteIpAddr);
                                         }
                                     }
                                 } catch (ClassNotFoundException e) {
