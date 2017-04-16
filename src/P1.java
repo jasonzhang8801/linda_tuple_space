@@ -1,4 +1,6 @@
 import java.io.*;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -10,13 +12,17 @@ import java.util.regex.Pattern;
 public class P1 {
     // refactor
     // to do ...
+
+    // nets map to store all the hosts' information
     public static ConcurrentHashMap<Integer, NetsEntry> netsMap = null;
+    // tuple space to store all the tuples
     public static ConcurrentHashMap<String, List<TupleSpaceEntry>> tupleSpace = new ConcurrentHashMap<>();
 
     // the local directory for nets map and tuple space
     public static String netsMapDir;
     public static String tupleSpaceDir;
 
+    // the local host information
     public static String ipAddr = null;
     public static int portNum = -1;
 

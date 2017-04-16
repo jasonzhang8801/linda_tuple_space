@@ -10,7 +10,12 @@ public class Message implements Serializable {
     String command = null;
     boolean success = false;
 
+    // network information
+    String ipAddr = null;
+    int portNum;
+
     // data field
     ConcurrentHashMap netsMap = null;
     List<Object> tuple = null;
+
 }

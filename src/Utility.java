@@ -54,10 +54,10 @@ public abstract class Utility {
             String withoutCommandSubstr = trimmedIn.substring(matcher.end(1)).trim();
 
             switch (commandName.toLowerCase()) {
-                case "add":
+                case "add": {
                     // initialize the field: remote host information
                     parserEntry.remoteHostsInfo = new ArrayList<>();
-                    
+
                     // store the valid remote host info into remoteHostInfo
                     // e.g. "hostname, 123.456.78.90, 1234"
                     int start_pos = 0;
@@ -126,9 +126,9 @@ public abstract class Utility {
                             parserEntry.remoteHostsInfo.add(remotePortNum);
                         }
                     }
-
                     break;
-                case "out":
+                }
+                case "out": {
                     // initialize the field: tuple
                     parserEntry.tuple = new ArrayList<>();
 
@@ -139,37 +139,42 @@ public abstract class Utility {
                     if (!matcher.find()) {
                         System.out.println("Error: invalid tuple");
                         System.out.println("Please type command \"help\" to get more details");
-                    }
-                    String content = matcher.group(1).trim();
+                        return null;
+                    } else {
+                        String content = matcher.group(1).trim();
 
-                    // assume no "," in the tuple
-                    String[] splitted = content.split(",");
+                        // assume no "," in the tuple
+                        String[] splitted = content.split(",");
 
-                    for (int i = 0; i < splitted.length; i++) {
-                        // trim the tuple component
-                        String s = splitted[i].trim();
+                        for (int i = 0; i < splitted.length; i++) {
+                            // trim the tuple component
+                            String s = splitted[i].trim();
 
-                        if (isInteger(s)) {
-                            parserEntry.tuple.add(new Integer(s));
-                        } else if (isFloat(s)) {
-                            parserEntry.tuple.add(new Float(s));
-                        } else if (isString(s)) {
-                            parserEntry.tuple.add(s);
-                        } else {
-                            System.out.println("Error: invalid tuple component type");
-                            System.out.println("Please type command \"help\" to get more details");
-                            return null;
+                            if (isString(s)) {
+                                parserEntry.tuple.add(s);
+                            } else if (isInteger(s)) {
+                                parserEntry.tuple.add(new Integer(s));
+                            } else if (isFloat(s)) {
+                                parserEntry.tuple.add(new Float(s));
+                            } else {
+                                System.out.println("Error: invalid tuple component type");
+                                System.out.println("Please type command \"help\" to get more details");
+                                return null;
+                            }
                         }
-                    }
 
 //                    // test only
 //                    for (Object obj : parserEntry.tuple) {
 //                        String className = obj.getClass().getName().split("\\.")[2];
 //                        System.out.println("class name is " + className);
 //                    }
+                    }
 
                     break;
-                case "rd":
+                }
+                // both command "in" and "rd"
+                case "in":
+                case "rd": {
                     // initialize the field: tuple
                     parserEntry.tuple = new ArrayList<>();
 
@@ -180,16 +185,73 @@ public abstract class Utility {
                     if (!matcher.find()) {
                         System.out.println("Error: invalid tuple");
                         System.out.println("Please type command \"help\" to get more details");
+                        return null;
+                    } else {
+                        String content = matcher.group(1).trim();
+
+                        // assume no "," in the tuple
+                        String[] splitted = content.split(",");
+
+                        for (int i = 0; i < splitted.length; i++) {
+                            // trim the tuple component
+                            String s = splitted[i].trim();
+
+                            if (isString(s)) {
+                                parserEntry.tuple.add(s);
+                            } else if (isInteger(s)) {
+                                parserEntry.tuple.add(new Integer(s));
+                            } else if (isFloat(s)) {
+                                parserEntry.tuple.add(new Float(s));
+                            } else {
+                                // for variable type component
+                                pattern = Pattern.compile("^\\?(.*):(.*)");
+                                matcher = pattern.matcher(s);
+
+                                if (!matcher.find()) {
+                                    System.out.println("Error: invalid tuple component type");
+                                    System.out.println("Please type command \"help\" to get more details");
+                                    return null;
+                                }
+
+                                String varName = matcher.group(1).trim();
+                                String typeName = matcher.group(2).trim();
+
+                                // the string array to store the implicit type and variable
+                                String[] implicitType = new String[2];
+                                implicitType[0] = varName;
+
+                                // convert the the type name to lower case and compare with defined type
+                                if (typeName.toLowerCase().equals("int")) {
+                                    implicitType[1] = "java.lang.Integer";
+                                } else if (typeName.toLowerCase().equals("float")) {
+                                    implicitType[1] = "java.lang.Float";
+                                } else if (typeName.toLowerCase().equals("string")) {
+                                    implicitType[1] = "java.lang.String";
+                                } else {
+                                    System.out.println("Error: invalid query on implicit type match");
+                                    System.out.println("Help: please use the following format");
+                                    System.out.println("?var:type where type could be \"int\" or \"float\" or \"string\"");
+                                    return null;
+                                }
+
+                                parserEntry.tuple.add(implicitType);
+                                Client.isBroadcast = true;
+                            }
+                        }
+
+//                        // test only
+//                        for (Object obj : parserEntry.tuple) {
+//                            String className = obj.getClass().getName().split("\\.")[2];
+//                            System.out.println("class name is " + className);
+//                            System.out.println("component is " + obj.toString());
+//                        }
                     }
-                    String content = matcher.group(1).trim();
-
-                    // assume no "," in the tuple
-                    String[] splitted = content.split(",");
                     break;
-                default:
+                }
+                default: {
                     // no valid command name
-
                     break;
+                }
             }
         }
 
@@ -386,6 +448,11 @@ public abstract class Utility {
 
 //        // parser function out
 //        String in = "out (\"abc\", 123,   1.5)";
+//        ParserEntry parserEntry = Utility.parser(in);
+//        System.out.println("command is " + parserEntry.commandName);
+
+//        // parser function out
+//        String in = "rd (\"abc\", 123,   ?i:integer)";
 //        ParserEntry parserEntry = Utility.parser(in);
 //        System.out.println("command is " + parserEntry.commandName);
 
