@@ -63,6 +63,13 @@ public class ServerWorker implements Runnable {
                             receivedMessage.success = true;
                             out.writeObject(receivedMessage);
 
+                            // update the netsMap into the file
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.netsMapDir))) {
+                                objOut.writeObject(P1.netsMap);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
                             System.out.println("Server: update the local nets map and send back ACK message");
                             break;
                         }
@@ -119,10 +126,17 @@ public class ServerWorker implements Runnable {
                                 // but the tuple is not in the tuple linked list
                             }
 
-
                             // send back ACK to inform
                             receivedMessage.success = true;
                             out.writeObject(receivedMessage);
+
+                            // update the tupleSpace into the file
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
+                                objOut.writeObject(P1.tupleSpace);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
 //                            System.out.println("put tuple " + receivedMessage.tuple.toString() + " on " + P1.ipAddr);
                             break;
                         }
@@ -158,8 +172,17 @@ public class ServerWorker implements Runnable {
 
                             // send back ACK to inform
                             receivedMessage.success = true;
+                            receivedMessage.ipAddr = P1.ipAddr;
+                            receivedMessage.portNum = P1.portNum;
                             out.writeObject(receivedMessage);
                             System.out.println("Server: send back the message with queried tuple " + queriedTuple.toString());
+
+                            // update the tupleSpace into the file
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
+                                objOut.writeObject(P1.tupleSpace);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
 
                             break;
                         }

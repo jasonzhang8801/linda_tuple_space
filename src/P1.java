@@ -1,4 +1,7 @@
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -59,21 +62,76 @@ public class P1 {
         // to do ...
         netsMap = new ConcurrentHashMap<>();
 
-        // create directories
+
         // nets info: /tmp/<userlogin>/linda/<hostname>/nets
         // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
-        String inforDir = "/tmp/szhang/linda/" + hostName + "/";
-        String netsFile = "nets.txt";
-        String tuplesFile = "tuples.txt";
-        new File(inforDir).mkdirs();
-        netsMapDir = inforDir + netsFile;
-        tupleSpaceDir = inforDir + tuplesFile;
+        String infoDirStr = "/tmp/szhang/linda/" + hostName + "/";
+        String netsFileStr = "nets.txt";
+        String tuplesFileStr = "tuples.txt";
+        P1.netsMapDir = infoDirStr + netsFileStr;
+        P1.tupleSpaceDir = infoDirStr + tuplesFileStr;
 
+        // clean up the nets.txt and tuples.txt
+        Path netsPath = Paths.get(P1.netsMapDir);
+        Path tuplesPath = Paths.get(P1.tupleSpaceDir);
         try {
-            new File(netsMapDir).createNewFile();
-            new File(tupleSpaceDir).createNewFile();
+            Files.deleteIfExists(netsPath);
+            Files.deleteIfExists(tuplesPath);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        // create directories
+        File infoDir = new File(infoDirStr);
+        infoDir.mkdirs();
+
+        // change the directory's mode
+        // change the userName level directory mode
+        String userNameDirStr = "/tmp/szhang/";
+        File userNameDir = new File(userNameDirStr);
+        if (userNameDir.setReadable(true, false) && userNameDir.setWritable(true, false) && userNameDir.setExecutable(true, false)) {
+            System.out.println("P1: successfully changed the directory " + userNameDir + " to 777");
+        } else {
+            System.out.println("P1: failed to change the directory " + userNameDir + " to 777");
+        }
+
+        // change the linda level directory mode
+        String lindaDirStr = "/tmp/szhang/linda/";
+        File lindaDir = new File(lindaDirStr);
+        if (lindaDir.setReadable(true, false) && lindaDir.setWritable(true, false) && lindaDir.setExecutable(true, false)) {
+            System.out.println("P1: successfully changed the directory " + lindaDirStr + " to 777");
+        } else {
+            System.out.println("P1: failed to change the directory " + lindaDirStr + " to 777");
+        }
+
+        // change the hostName level directory mode
+        if (infoDir.setReadable(true,false) && infoDir.setWritable(true,false) && infoDir.setExecutable(true,false)) {
+            System.out.println("P1: successfully changed the directory " + infoDirStr + " to 777");
+        } else {
+            System.out.println("P1: failed to changed the directory " + infoDirStr + " to 777");
+        }
+
+        // create files
+        File netsFile = new File(netsMapDir);
+        File tuplesFile = new File(tupleSpaceDir);
+        try {
+            netsFile.createNewFile();
+            tuplesFile.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // change the files' mode
+        if (netsFile.setReadable(true, false) && netsFile.setWritable(true, false)) {
+            System.out.println("P1: successfully changed the file " + netsFileStr + " to 666");
+        } else {
+            System.out.println("P1: failed change the file " + netsFileStr + " to 666");
+        }
+
+        if (tuplesFile.setReadable(true, false) && tuplesFile.setWritable(true, false)) {
+            System.out.println("P1: successfully changed the file " + tuplesFileStr + " to 666");
+        } else {
+            System.out.println("P1: failed to change the file " + tuplesFileStr + " to 666");
         }
 
 //        // store a empty tuple space into the file

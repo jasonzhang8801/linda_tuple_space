@@ -121,7 +121,10 @@ public class Client {
                                     }
                                 }
                             } catch (Exception e) {
-                                e.printStackTrace();
+//                                e.printStackTrace();
+                                System.out.println("Client: invalid IP or port number");
+                                System.out.println("Help: please check the host IP and port number");
+                                System.exit(0);
                             }
 
                         }
@@ -141,6 +144,7 @@ public class Client {
                             }
 
                             System.out.println("Client: successfully merge the nets map");
+
                             // test only
                             // print out the nets map
 //                            for (int id : P1.netsMap.keySet()) {
@@ -192,6 +196,13 @@ public class Client {
                                         e.printStackTrace();
                                     }
                                 }
+                            }
+
+                            // update the netsMap into the file
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.netsMapDir))) {
+                                objOut.writeObject(P1.netsMap);
+                            } catch (IOException e) {
+                                e.printStackTrace();
                             }
                         }
                         state = "idle";
@@ -347,6 +358,12 @@ public class Client {
 
                             // keep checking the broadcast message queue
                             while (receivedMessage == null) {
+                                // NEED TO FIX
+                                // to do ...
+                                // if user A uses the client to do the implicit type match first, e.g. rd(?i:int)
+                                // then another user B uses the client to put out(1) into the tuple space
+                                // user A's client still gets stuck unless user A's console keeps printing stuff...
+                                System.out.print("");
                                 if (!Client.broadcastQueue.isEmpty()) {
                                     receivedMessage = Client.broadcastQueue.peek();
                                 }
@@ -460,6 +477,12 @@ public class Client {
 
                             // keep checking the broadcast message queue
                             while (receivedMessage == null) {
+                                // NEED TO FIX
+                                // to do ...
+                                // if user A uses the client to do the implicit type match first, e.g. rd(?i:int)
+                                // then another user B uses the client to put out(1) into the tuple space
+                                // user A's client still gets stuck unless user A's console keeps printing stuff...
+                                System.out.print("");
                                 if (!Client.broadcastQueue.isEmpty()) {
                                     receivedMessage = Client.broadcastQueue.peek();
                                 }
