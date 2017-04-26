@@ -1,9 +1,6 @@
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,7 +74,7 @@ public class Client {
                         int count = 0;
 
                         // construct the NetsEntry list
-                        List<ConcurrentHashMap<Integer, NetsEntry>> listOfReceivedNetsMap = new ArrayList<>();
+                        List<LinkedHashMap<String, NetsEntry>> listOfReceivedNetsMap = new ArrayList<>();
 
                         // collect the netsMap from remote server
                         // check how many netsMap the local server received
@@ -107,9 +104,9 @@ public class Client {
 
                                     try {
                                         if ((receivedMessage = (Message) in.readObject()) != null) {
-                                            ConcurrentHashMap<Integer, NetsEntry> remoteNetsMap = receivedMessage.netsMap;
+                                            LinkedHashMap<String, NetsEntry> remoteNetsMap = receivedMessage.netsMap;
                                             if (receivedMessage.success != true) {
-                                                System.out.println("Error: remoted server failed to send back its nets infomation");
+                                                System.out.println("Error: remote server failed to send back its nets infomation");
                                             } else if (receivedMessage.command.equals("add")) {
                                                 listOfReceivedNetsMap.add(remoteNetsMap);
                                                 System.out.println("Client: received message with nets map from the remote host"
@@ -134,33 +131,32 @@ public class Client {
                         if (numOfHost != listOfReceivedNetsMap.size()) {
                             System.out.println("Error: expected to connect with " + numOfHost + " remote hosts, but only connected with " + listOfReceivedNetsMap.size());
                         } else {
-                            // assign id to each remote host except local host
-                            // assign id 0 to local host as master
+                            // no ID assigned
+                            // K: hostName, V: netsEntry
                             for (int i = 0; i < numOfHost; i++) {
-                                int remoteId = i + 1;
-                                NetsEntry remoteNetsEntry = listOfReceivedNetsMap.get(i).get(0);
-                                remoteNetsEntry.hostId = remoteId;
-                                P1.netsMap.put(remoteId, remoteNetsEntry);
+                                LinkedHashMap<String, NetsEntry> remoteNetsMap = listOfReceivedNetsMap.get(i);
+                                String remoteHostName = Utility.netsMapIndexToKey(0, remoteNetsMap);
+                                P2.netsMap.put(remoteHostName, remoteNetsMap.get(remoteHostName));
                             }
 
                             System.out.println("Client: successfully merge the nets map");
 
                             // test only
                             // print out the nets map
-//                            for (int id : P1.netsMap.keySet()) {
+//                            int hostId = 0;
+//                            for (String hostName : P2.netsMap.keySet()) {
 //                                System.out.println("Merged nets");
-//                                System.out.println("key: " + id + " hostName: " + P1.netsMap.get(id).hostName + " hostId: " + P1.netsMap.get(id).hostId);
+//                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
 //                            }
 
                             // send the merged nets back to remote servers
-                            for (int id : P1.netsMap.keySet()) {
-                                if (id != 0) {
-                                    String remoteIpAddr = P1.netsMap.get(id).ipAddr;
-                                    int remotePortNum = P1.netsMap.get(id).portNum;
+                            for (String hostName : P2.netsMap.keySet()) {
+                                if (!hostName.equals(P2.hostName)) {
+                                    String remoteIpAddr = P2.netsMap.get(hostName).ipAddr;
+                                    int remotePortNum = P2.netsMap.get(hostName).portNum;
 
                                     try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
                                     {
-
                                         try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                                              ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                                         )
@@ -168,7 +164,7 @@ public class Client {
                                             // construct the merge message with add
                                             Message sendMessage = new Message();
                                             sendMessage.command = "merge";
-                                            sendMessage.netsMap = P1.netsMap;
+                                            sendMessage.netsMap = P2.netsMap;
 
                                             // send the message to remote server
                                             out.writeObject(sendMessage);
@@ -199,8 +195,8 @@ public class Client {
                             }
 
                             // update the netsMap into the file
-                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.netsMapDir))) {
-                                objOut.writeObject(P1.netsMap);
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
+                                objOut.writeObject(P2.netsMap);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -213,7 +209,7 @@ public class Client {
                         List<Object> tuple = parserEntry.tuple;
 
                         // check the number of host
-                        if (P1.netsMap.size() <= 0) {
+                        if (P2.netsMap.size() <= 0) {
                             System.out.println("System error: the number of host should be larger than zero");
                             System.out.println("Help: please use command \"add\" to add more hosts");
                             state = "idle";
@@ -221,13 +217,11 @@ public class Client {
                         }
 
                         // hash the tuple to get the host information
-                        int hostId = Utility.hashToId(tuple, P1.netsMap.size());
-//                        System.out.println("host id is " + hostId);
-//                        System.out.println("host name is " + P1.netsMap.get(hostId).hostName
-//                                + "host ip is " + P1.netsMap.get(hostId).ipAddr
-//                                + "host port is " + P1.netsMap.get(hostId).portNum);
-                        String remoteIpAddr = P1.netsMap.get(hostId).ipAddr;
-                        int remotePortNum = P1.netsMap.get(hostId).portNum;
+                        int hostId = Utility.hashToId(tuple, P2.netsMap.size());
+                        // list of hostName in inserted order
+                        List<String> listOfHostName = new ArrayList<>(P2.netsMap.keySet());
+                        String remoteIpAddr = P2.netsMap.get(hostId).ipAddr;
+                        int remotePortNum = P2.netsMap.get(hostId).portNum;
 
                         // connect to the remote host
                         try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
@@ -269,7 +263,7 @@ public class Client {
                     }
                     case "rd": {
                         // check the number of host
-                        if (P1.netsMap.size() <= 0) {
+                        if (P2.netsMap.size() <= 0) {
                             System.out.println("System error: the number of host should be larger than zero");
                             System.out.println("Help: please use command \"add\" to add more hosts");
                             state = "idle";
@@ -283,13 +277,13 @@ public class Client {
                             List<Object> tuple = parserEntry.tuple;
 
                             // hash the tuple to get the host information
-                            int hostId_rd = Utility.hashToId(tuple, P1.netsMap.size());
+                            int hostId_rd = Utility.hashToId(tuple, P2.netsMap.size());
 //                        System.out.println("host id is " + hostId);
-//                        System.out.println("host name is " + P1.netsMap.get(hostId).hostName
-//                                + "host ip is " + P1.netsMap.get(hostId).ipAddr
-//                                + "host port is " + P1.netsMap.get(hostId).portNum);
-                            String remoteIpAddr = P1.netsMap.get(hostId_rd).ipAddr;
-                            int remotePortNum = P1.netsMap.get(hostId_rd).portNum;
+//                        System.out.println("host name is " + P2.netsMap.get(hostId).hostName
+//                                + "host ip is " + P2.netsMap.get(hostId).ipAddr
+//                                + "host port is " + P2.netsMap.get(hostId).portNum);
+                            String remoteIpAddr = P2.netsMap.get(hostId_rd).ipAddr;
+                            int remotePortNum = P2.netsMap.get(hostId_rd).portNum;
 
                             // connect to the remote host
                             try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
@@ -342,7 +336,7 @@ public class Client {
                             List<Thread> threadPool = new ArrayList<>();
 
                             // send out the broadcast messages
-                            for (NetsEntry netsEntry : P1.netsMap.values()) {
+                            for (NetsEntry netsEntry : P2.netsMap.values()) {
                                 String remoteIpAddr = netsEntry.ipAddr;
                                 int remotePortNum = netsEntry.portNum;
 
@@ -388,7 +382,7 @@ public class Client {
                     }
                     case "in": {
                         // check the number of host
-                        if (P1.netsMap.size() <= 0) {
+                        if (P2.netsMap.size() <= 0) {
                             System.out.println("System error: the number of host should be larger than zero");
                             System.out.println("Help: please use command \"add\" to add more hosts");
                             state = "idle";
@@ -402,13 +396,13 @@ public class Client {
                             List<Object> tuple = parserEntry.tuple;
 
                             // hash the tuple to get the host information
-                            int hostId_rd = Utility.hashToId(tuple, P1.netsMap.size());
+                            int hostId_rd = Utility.hashToId(tuple, P2.netsMap.size());
 //                        System.out.println("host id is " + hostId);
-//                        System.out.println("host name is " + P1.netsMap.get(hostId).hostName
-//                                + "host ip is " + P1.netsMap.get(hostId).ipAddr
-//                                + "host port is " + P1.netsMap.get(hostId).portNum);
-                            String remoteIpAddr = P1.netsMap.get(hostId_rd).ipAddr;
-                            int remotePortNum = P1.netsMap.get(hostId_rd).portNum;
+//                        System.out.println("host name is " + P2.netsMap.get(hostId).hostName
+//                                + "host ip is " + P2.netsMap.get(hostId).ipAddr
+//                                + "host port is " + P2.netsMap.get(hostId).portNum);
+                            String remoteIpAddr = P2.netsMap.get(hostId_rd).ipAddr;
+                            int remotePortNum = P2.netsMap.get(hostId_rd).portNum;
 
                             // connect to the remote host
                             try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
@@ -461,7 +455,7 @@ public class Client {
                             List<Thread> threadPool = new ArrayList<>();
 
                             // send out the broadcast messages
-                            for (NetsEntry netsEntry : P1.netsMap.values()) {
+                            for (NetsEntry netsEntry : P2.netsMap.values()) {
                                 String remoteIpAddr = netsEntry.ipAddr;
                                 int remotePortNum = netsEntry.portNum;
 

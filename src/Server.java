@@ -1,13 +1,6 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by jasonzhang on 4/7/17.
@@ -39,11 +32,12 @@ public class Server implements Runnable {
             localHostInfo.hostName = hostName;
             localHostInfo.ipAddr = ipAddr;
             localHostInfo.portNum = portNum;
-            P1.netsMap.put(0, localHostInfo);
+            P2.netsMap.put(hostName, localHostInfo);
 
-            // assign the ip and port back to P1 for print on the console
-            P1.ipAddr = ipAddr;
-            P1.portNum = portNum;
+            // assign the ip and port back to P2 for print on the console
+            P2.hostName = hostName;
+            P2.ipAddr = ipAddr;
+            P2.portNum = portNum;
 
             // listen on the port
             while (true) {

@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,7 +16,7 @@ public class Message implements Serializable {
     int portNum;
 
     // data field
-    ConcurrentHashMap netsMap = null;
+    LinkedHashMap netsMap = null;
     List<Object> tuple = null;
 
 }

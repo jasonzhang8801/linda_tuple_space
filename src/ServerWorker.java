@@ -1,5 +1,4 @@
 import java.io.*;
-import java.lang.invoke.SwitchPoint;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,7 +35,7 @@ public class ServerWorker implements Runnable {
                         case "add": {
                             // send current host's nets map back
                             System.out.println("Server: received message with command " + receivedMessage.command);
-                            receivedMessage.netsMap = P1.netsMap;
+                            receivedMessage.netsMap = P2.netsMap;
                             receivedMessage.success = true;
                             out.writeObject(receivedMessage);
                             System.out.println("Server: send back message with the local nets map");
@@ -50,13 +49,14 @@ public class ServerWorker implements Runnable {
                             }
                             System.out.println("Server: received message with command " + receivedMessage.command);
                             // update the current host's nets map
-                            P1.netsMap = receivedMessage.netsMap;
+                            P2.netsMap = receivedMessage.netsMap;
 
                             // test only
                             // print out the nets map
-//                            for (int id : P1.netsMap.keySet()) {
+//                            int hostId = 0;
+//                            for (String hostName : P2.netsMap.keySet()) {
 //                                System.out.println("Merged nets");
-//                                System.out.println("key: " + id + " hostName: " + P1.netsMap.get(id).hostName  + " hostId: " + P1.netsMap.get(id).hostId);
+//                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
 //                            }
 
                             // send back ACK message
@@ -64,8 +64,8 @@ public class ServerWorker implements Runnable {
                             out.writeObject(receivedMessage);
 
                             // update the netsMap into the file
-                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.netsMapDir))) {
-                                objOut.writeObject(P1.netsMap);
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
+                                objOut.writeObject(P2.netsMap);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -89,7 +89,7 @@ public class ServerWorker implements Runnable {
                             // get the hash of the tuple
                             String hashString = Utility.hashTuple(receivedTuple);
 
-                            if (!P1.tupleSpace.containsKey(hashString)) {
+                            if (!P2.tupleSpace.containsKey(hashString)) {
                                 // the first tuple with the hash string
                                 // create a new tuple entry
                                 TupleSpaceEntry tupleSpaceEntry = new TupleSpaceEntry();
@@ -101,13 +101,13 @@ public class ServerWorker implements Runnable {
                                 tupleLinkedList.add(tupleSpaceEntry);
 
                                 // put the tuple linked list into the tuple space
-                                P1.tupleSpace.put(hashString, tupleLinkedList);
+                                P2.tupleSpace.put(hashString, tupleLinkedList);
 
                                 System.out.println("Server: new tuple " + receivedMessage.tuple.toString()
                                         + " in the tuple space with count " + tupleSpaceEntry.count);
                             } else {
                                 // iterate to find the given tuple
-                                List<TupleSpaceEntry> tupleLinkedList = P1.tupleSpace.get(hashString);
+                                List<TupleSpaceEntry> tupleLinkedList = P2.tupleSpace.get(hashString);
                                 for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
                                     List<Object> curTuple = tupleSpaceEntry.tuple;
 
@@ -131,13 +131,13 @@ public class ServerWorker implements Runnable {
                             out.writeObject(receivedMessage);
 
                             // update the tupleSpace into the file
-                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
-                                objOut.writeObject(P1.tupleSpace);
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.tupleSpaceDir))) {
+                                objOut.writeObject(P2.tupleSpace);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
 
-//                            System.out.println("put tuple " + receivedMessage.tuple.toString() + " on " + P1.ipAddr);
+//                            System.out.println("put tuple " + receivedMessage.tuple.toString() + " on " + P2.ipAddr);
                             break;
                         }
                         case "rd": {
@@ -150,7 +150,7 @@ public class ServerWorker implements Runnable {
 
                             List<Object> queriedTuple = null;
                             while (queriedTuple == null) {
-                                queriedTuple = containsTuple(receivedTuple, command, P1.tupleSpace);
+                                queriedTuple = containsTuple(receivedTuple, command, P2.tupleSpace);
                             }
 
                             // send back ACK to inform
@@ -167,19 +167,19 @@ public class ServerWorker implements Runnable {
 
                             List<Object> queriedTuple = null;
                             while (queriedTuple == null) {
-                                queriedTuple = containsTuple(receivedTuple, command, P1.tupleSpace);
+                                queriedTuple = containsTuple(receivedTuple, command, P2.tupleSpace);
                             }
 
                             // send back ACK to inform
                             receivedMessage.success = true;
-                            receivedMessage.ipAddr = P1.ipAddr;
-                            receivedMessage.portNum = P1.portNum;
+                            receivedMessage.ipAddr = P2.ipAddr;
+                            receivedMessage.portNum = P2.portNum;
                             out.writeObject(receivedMessage);
                             System.out.println("Server: send back the message with queried tuple " + queriedTuple.toString());
 
                             // update the tupleSpace into the file
-                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
-                                objOut.writeObject(P1.tupleSpace);
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.tupleSpaceDir))) {
+                                objOut.writeObject(P2.tupleSpace);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -193,14 +193,14 @@ public class ServerWorker implements Runnable {
 
                             List<Object> queriedTuple = null;
                             while (queriedTuple == null) {
-                                queriedTuple = containsTuple(receivedTuple, command, P1.tupleSpace);
+                                queriedTuple = containsTuple(receivedTuple, command, P2.tupleSpace);
                             }
 
                             // send back ACK to inform
                             receivedMessage.success = true;
                             receivedMessage.tuple = queriedTuple;
-                            receivedMessage.ipAddr = P1.ipAddr;
-                            receivedMessage.portNum = P1.portNum;
+                            receivedMessage.ipAddr = P2.ipAddr;
+                            receivedMessage.portNum = P2.portNum;
                             out.writeObject(receivedMessage);
                             System.out.println("Server: send back the message with queried tuple " + queriedTuple.toString());
 
@@ -324,8 +324,8 @@ public class ServerWorker implements Runnable {
                 // get the hash string
                 String hashString = Utility.hashTuple(receivedTuple);
 
-                if (P1.tupleSpace.containsKey(hashString)) {
-                    List<TupleSpaceEntry> tupleLinkedList = P1.tupleSpace.get(hashString);
+                if (P2.tupleSpace.containsKey(hashString)) {
+                    List<TupleSpaceEntry> tupleLinkedList = P2.tupleSpace.get(hashString);
 
                     // find if the received tuple in the linked list
                     for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
@@ -344,8 +344,8 @@ public class ServerWorker implements Runnable {
                 // get the hash string
                 String hashString = Utility.hashTuple(receivedTuple);
 
-                if (P1.tupleSpace.containsKey(hashString)) {
-                    List<TupleSpaceEntry> tupleLinkedList = P1.tupleSpace.get(hashString);
+                if (P2.tupleSpace.containsKey(hashString)) {
+                    List<TupleSpaceEntry> tupleLinkedList = P2.tupleSpace.get(hashString);
 
                     // find if the received tuple in the linked list
                     for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
@@ -359,11 +359,11 @@ public class ServerWorker implements Runnable {
 
                             // remove the tuple from the tuple space
                             if (tupleSpaceEntry.count == 0) {
-                                P1.tupleSpace.remove(hashString);
+                                P2.tupleSpace.remove(hashString);
                                 System.out.println("Server: remove the queried tuple " + curTuple.toString());
                                 System.out.println("Server: the tuple space contains the tuple "
                                         + curTuple.toString() + "? "
-                                        + P1.tupleSpace.containsKey(hashString));
+                                        + P2.tupleSpace.containsKey(hashString));
                             }
                             return curTuple;
                         }
@@ -374,7 +374,7 @@ public class ServerWorker implements Runnable {
             case "rd_broadcast":
             case "in_broadcast": {
                 // go through the whole tuple space
-                for (List<TupleSpaceEntry> tupleLinkedList : P1.tupleSpace.values()) {
+                for (List<TupleSpaceEntry> tupleLinkedList : P2.tupleSpace.values()) {
                     for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
                         List<Object> curTuple = tupleSpaceEntry.tuple;
 

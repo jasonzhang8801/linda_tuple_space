@@ -2,9 +2,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,33 +10,66 @@ import java.util.regex.Pattern;
 /**
  * Created by jasonzhang on 4/7/17.
  */
-public class P1 {
+public class P2 {
     // refactor
     // to do ...
+    // constant
+    // the size of lookUp table
+    public final static int SIZE_LUT = 65536;
 
     // nets map to store all the hosts' information
-    public static ConcurrentHashMap<Integer, NetsEntry> netsMap = null;
+    public static LinkedHashMap<String, NetsEntry> netsMap = null;
     // tuple space to store all the tuples
     public static ConcurrentHashMap<String, List<TupleSpaceEntry>> tupleSpace = new ConcurrentHashMap<>();
+    // backup tuple space to store all the backup tuples
+    public static ConcurrentHashMap<String, List<TupleSpaceEntry>> backUpTupleSpace = new ConcurrentHashMap<>();
 
-    // the local directory for nets map and tuple space
+    // lookUp table
+    public static List<String> LUT = Collections.synchronizedList(new ArrayList<>());
+    // reversed lookUp table
+    public static Map<String, List<Integer>> RLUT = new ConcurrentHashMap<>();
+
+    // the local directory for nets map, tuple space and backup tuple space
     public static String netsMapDir;
     public static String tupleSpaceDir;
+    public static String backUpTupleSpaceDir;
 
     // the local host information
+    public static String hostName = null;
     public static String ipAddr = null;
     public static int portNum = -1;
+
+    /**
+     * initialize lookUp table and reversed lookUp table
+     * @return boolean
+     */
+    private boolean initLUTs() {
+        if (P2.hostName != null) {
+            List<Integer> listOfSlotID = new ArrayList<>();
+
+            for (int i = 0; i < SIZE_LUT; i++) {
+                P2.LUT.add(P2.hostName);
+                listOfSlotID.add(i);
+            }
+
+            P2.RLUT.put(P2.hostName, listOfSlotID);
+            return true;
+        }
+        return false;
+    }
 
     @SuppressWarnings("unchecked")
     // suppress compiler warning when hashmap assignment
     public static void main(String args[]) {
+        // create a instance of P2
+        P2 p2 = new P2();
 
         // assign host name
         // check the user input
         if (args == null || args.length != 1) {
             System.out.println("Error: invalid parameter");
             System.out.println("Help: please type the following command to start the program");
-            System.out.println("java P1 hostName");
+            System.out.println("java P2 hostName");
             return;
         }
 
@@ -60,20 +91,19 @@ public class P1 {
 
         // load the nets
         // to do ...
-        netsMap = new ConcurrentHashMap<>();
-
+        netsMap = new LinkedHashMap<>();
 
         // nets info: /tmp/<userlogin>/linda/<hostname>/nets
         // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
         String infoDirStr = "/tmp/szhang/linda/" + hostName + "/";
         String netsFileStr = "nets.txt";
         String tuplesFileStr = "tuples.txt";
-        P1.netsMapDir = infoDirStr + netsFileStr;
-        P1.tupleSpaceDir = infoDirStr + tuplesFileStr;
+        P2.netsMapDir = infoDirStr + netsFileStr;
+        P2.tupleSpaceDir = infoDirStr + tuplesFileStr;
 
         // clean up the nets.txt and tuples.txt
-        Path netsPath = Paths.get(P1.netsMapDir);
-        Path tuplesPath = Paths.get(P1.tupleSpaceDir);
+        Path netsPath = Paths.get(P2.netsMapDir);
+        Path tuplesPath = Paths.get(P2.tupleSpaceDir);
         try {
             Files.deleteIfExists(netsPath);
             Files.deleteIfExists(tuplesPath);
@@ -90,25 +120,25 @@ public class P1 {
         String userNameDirStr = "/tmp/szhang/";
         File userNameDir = new File(userNameDirStr);
         if (userNameDir.setReadable(true, false) && userNameDir.setWritable(true, false) && userNameDir.setExecutable(true, false)) {
-            System.out.println("P1: successfully changed the directory " + userNameDir + " to 777");
+            System.out.println("P2: successfully changed the directory " + userNameDir + " to 777");
         } else {
-            System.out.println("P1: failed to change the directory " + userNameDir + " to 777");
+            System.out.println("P2: failed to change the directory " + userNameDir + " to 777");
         }
 
         // change the linda level directory mode
         String lindaDirStr = "/tmp/szhang/linda/";
         File lindaDir = new File(lindaDirStr);
         if (lindaDir.setReadable(true, false) && lindaDir.setWritable(true, false) && lindaDir.setExecutable(true, false)) {
-            System.out.println("P1: successfully changed the directory " + lindaDirStr + " to 777");
+            System.out.println("P2: successfully changed the directory " + lindaDirStr + " to 777");
         } else {
-            System.out.println("P1: failed to change the directory " + lindaDirStr + " to 777");
+            System.out.println("P2: failed to change the directory " + lindaDirStr + " to 777");
         }
 
         // change the hostName level directory mode
         if (infoDir.setReadable(true,false) && infoDir.setWritable(true,false) && infoDir.setExecutable(true,false)) {
-            System.out.println("P1: successfully changed the directory " + infoDirStr + " to 777");
+            System.out.println("P2: successfully changed the directory " + infoDirStr + " to 777");
         } else {
-            System.out.println("P1: failed to changed the directory " + infoDirStr + " to 777");
+            System.out.println("P2: failed to changed the directory " + infoDirStr + " to 777");
         }
 
         // create files
@@ -123,19 +153,19 @@ public class P1 {
 
         // change the files' mode
         if (netsFile.setReadable(true, false) && netsFile.setWritable(true, false)) {
-            System.out.println("P1: successfully changed the file " + netsFileStr + " to 666");
+            System.out.println("P2: successfully changed the file " + netsFileStr + " to 666");
         } else {
-            System.out.println("P1: failed change the file " + netsFileStr + " to 666");
+            System.out.println("P2: failed change the file " + netsFileStr + " to 666");
         }
 
         if (tuplesFile.setReadable(true, false) && tuplesFile.setWritable(true, false)) {
-            System.out.println("P1: successfully changed the file " + tuplesFileStr + " to 666");
+            System.out.println("P2: successfully changed the file " + tuplesFileStr + " to 666");
         } else {
-            System.out.println("P1: failed to change the file " + tuplesFileStr + " to 666");
+            System.out.println("P2: failed to change the file " + tuplesFileStr + " to 666");
         }
 
 //        // store a empty tuple space into the file
-//        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P1.tupleSpaceDir))) {
+//        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.tupleSpaceDir))) {
 //            objOut.writeObject(new ConcurrentHashMap<String,List<TupleSpaceEntry>>());
 //        } catch (IOException e) {
 //            e.printStackTrace();
@@ -151,7 +181,13 @@ public class P1 {
         }
         System.out.println(ipAddr + " at port number: " + portNum);
 
-        // create the client in the same thread with P1
+
+        // initialize lookUp table and reversed lookUp table
+        if (!p2.initLUTs()) {
+            System.out.println("Error: failed to initialize the lookUp table");
+        }
+
+        // create the client in the same thread with P2
         // client handle user's input from the console
         Client client = new Client();
         client.setUp();

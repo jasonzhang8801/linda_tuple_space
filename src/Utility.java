@@ -1,10 +1,7 @@
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -403,6 +400,20 @@ public abstract class Utility {
         }
 
         return hashString;
+    }
+
+    /**
+     * convert the inserted index to netsMap's key hostName
+     * @param index
+     * @param netsMap
+     * @return hostName
+     */
+    public static String netsMapIndexToKey(int index, LinkedHashMap<String, NetsEntry> netsMap) {
+        if (netsMap == null || index < 0) return null;
+
+        List<String> listOfHostName = new ArrayList<>(netsMap.keySet());
+
+        return listOfHostName.get(index);
     }
 
     /**

@@ -9,12 +9,12 @@ Step 1.
 $ javac *.java
 
 Step 2. 
--run P1.class to start the console
--P1 will create 2 directories: /tmp/<login>/linda/<hostName>/nets.txt and /tmp/<login>/linda/<hostName>/tuple.txt
--P1 will change the permission mode for both directories above
--P1 will randomly choose an available port number
--P1 will create a new thread for server to listen on given port
-$ java P1 hostName
+-run P2.class to start the console
+-P2 will create 2 directories: /tmp/<login>/linda/<hostName>/nets.txt and /tmp/<login>/linda/<hostName>/tuple.txt
+-P2 will change the permission mode for both directories above
+-P2 will randomly choose an available port number
+-P2 will create a new thread for server to listen on given port
+$ java P2 hostName
 
 Step 3. 
 -repeat Step 2 to start multiple hosts
@@ -36,4 +36,4 @@ linda> in(?i:int)
 linda> rd("abc")
 
 Step 6. 
--use ctrl + c to close P1 program
+-use ctrl + c to close P2 program
