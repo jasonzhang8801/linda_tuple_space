@@ -22,7 +22,6 @@ public class Client {
         {
             String state = "idle";
             ParserEntry parserEntry = null;
-            int numOfHost = -1;
 
             while(true) {
                 if (state == null) {
@@ -63,7 +62,7 @@ public class Client {
                         List<String> listOfHost = parserEntry.remoteHostsInfo;
 
                         // num of host
-                        numOfHost = listOfHost.size() / 2;
+                        int numOfHost = listOfHost.size() / 2;
                         if (numOfHost <= 0) {
                             System.out.println("System error: the number of host should be larger than zero");
                             System.out.println("Help: please use command \"add\" to add more hosts");
@@ -72,7 +71,6 @@ public class Client {
                         }
 
                         int count = 0;
-
                         // construct the NetsEntry list
                         List<LinkedHashMap<String, NetsEntry>> listOfReceivedNetsMap = new ArrayList<>();
 
@@ -93,6 +91,8 @@ public class Client {
                                     // construct the send message with add
                                     Message sendMessage = new Message();
                                     sendMessage.command = "add";
+                                    sendMessage.success = false;
+                                    sendMessage.netsMap = null;
 
                                     // send the message to remote server
                                     out.writeObject(sendMessage);
@@ -136,6 +136,12 @@ public class Client {
                             for (int i = 0; i < numOfHost; i++) {
                                 LinkedHashMap<String, NetsEntry> remoteNetsMap = listOfReceivedNetsMap.get(i);
                                 String remoteHostName = Utility.netsMapIndexToKey(0, remoteNetsMap);
+
+                                if (P2.netsMap.containsKey(remoteHostName)) {
+                                    System.out.println("Error: host name should be unique");
+                                    System.out.println("Help: please exit and rename duplicated host");
+                                    System.exit(0);
+                                }
                                 P2.netsMap.put(remoteHostName, remoteNetsMap.get(remoteHostName));
                             }
 
@@ -149,8 +155,53 @@ public class Client {
 //                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
 //                            }
 
-                            // send the merged nets back to remote servers
+                            // split LUT and RLUT
+                            // number of slot per host
+                            int numOfSlot = P2.SIZE_LUT / P2.netsMap.size();
+                            List<String> listOfHostName = new ArrayList<>(P2.netsMap.keySet());
+                            List<Integer> listOfSlot = P2.RLUT.get(P2.hostName);
+
+                            // allocate the slots
+                            int start = 0;
+                            int end = numOfSlot;
+
+                            for (int i = 0; i < listOfHostName.size(); i++) {
+                                String hostName = listOfHostName.get(i);
+                                List<Integer> subListOfSlot = new ArrayList<>(listOfSlot.subList(start, end));
+
+                                // update RLUT
+                                P2.RLUT.put(hostName, subListOfSlot);
+
+                                // update the LUT
+                                for (int j = 0; j < subListOfSlot.size(); j++) {
+                                    P2.LUT.set(subListOfSlot.get(j), hostName);
+                                }
+
+                                // update the start index and end index
+                                start = end;
+                                // check if the host is the second from the end
+                                if (i == listOfHostName.size() - 2) {
+                                    end = listOfSlot.size();
+                                } else {
+                                    end += numOfSlot;
+                                }
+                            }
+                            System.out.println("Client: successfully reallocate the slot to look up table and reversed look up table");
+
+                            // test only
+//                            for (String hostName : P2.RLUT.keySet()) {
+//                                List<Integer> subListOfSlot = P2.RLUT.get(hostName);
+//                                System.out.println("host name " + hostName);
+//                                for (int i : subListOfSlot) {
+//                                    System.out.print(i + " ");
+//                                }
+//                            }
+
+                            // send the message back to remote servers
+                            // including, merged netsMap, updated LUT and updated RLUT
                             for (String hostName : P2.netsMap.keySet()) {
+
+                                // send the message to the remote hosts except current one
                                 if (!hostName.equals(P2.hostName)) {
                                     String remoteIpAddr = P2.netsMap.get(hostName).ipAddr;
                                     int remotePortNum = P2.netsMap.get(hostName).portNum;
@@ -164,7 +215,10 @@ public class Client {
                                             // construct the merge message with add
                                             Message sendMessage = new Message();
                                             sendMessage.command = "merge";
+                                            sendMessage.success = false;
                                             sendMessage.netsMap = P2.netsMap;
+                                            sendMessage.LUT = P2.LUT;
+                                            sendMessage.RLUT = P2.RLUT;
 
                                             // send the message to remote server
                                             out.writeObject(sendMessage);
@@ -173,10 +227,9 @@ public class Client {
 
                                             // construct the received object
                                             Message receivedMessage = null;
-
                                             try {
                                                 if ((receivedMessage = (Message) in.readObject()) != null) {
-                                                    if (receivedMessage.command.equals("merge")  && receivedMessage.success == true) {
+                                                    if (receivedMessage.command.equals("merge")  && receivedMessage.success) {
                                                         System.out.println("Client: successfully add the host with IP: " + remoteIpAddr
                                                                 + " port: " + remotePortNum );
                                                     } else {
@@ -216,48 +269,88 @@ public class Client {
                             break;
                         }
 
-                        // hash the tuple to get the host information
-                        int hostId = Utility.hashToId(tuple, P2.netsMap.size());
-                        // list of hostName in inserted order
-                        List<String> listOfHostName = new ArrayList<>(P2.netsMap.keySet());
-                        String remoteIpAddr = P2.netsMap.get(hostId).ipAddr;
-                        int remotePortNum = P2.netsMap.get(hostId).portNum;
+                        //
+                        // find the original host and backUp host information
+                        //
+                        // hash the tuple to get slot id
+                        int slotId = Utility.hashToSlotId(tuple);
 
-                        // connect to the remote host
-                        try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
-                        {
+                        // create a list to store the host information
+                        List<NetsEntry> listOfHostInfo = new ArrayList<>();
 
-                            try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                            )
-                            {
-                                // construct the send message with out
-                                Message sendMessage = new Message();
-                                sendMessage.command = "out";
-                                sendMessage.tuple = tuple;
-
-                                // send the message to remote server
-                                out.writeObject(sendMessage);
-                                System.out.println("Client: send the tuple to the host with IP " + remoteIpAddr);
-
-                                // construct the received object
-                                Message receivedMessage = null;
-
-                                try {
-                                    if ((receivedMessage = (Message) in.readObject()) != null) {
-                                        if (receivedMessage.success != true) {
-                                            System.out.println("Error: remoted server failed to put the given tuple");
-                                        } else if (receivedMessage.command.equals("out")) {
-                                            System.out.println("put tuple " + receivedMessage.tuple.toString() + " on " + remoteIpAddr);
-                                        }
-                                    }
-                                } catch (ClassNotFoundException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                        // put the original host information
+                        String oriHostName = P2.LUT.get(slotId);
+                        if (oriHostName == null) {
+                            System.out.println("System error: failed to get original host name in lookUp table");
+                            state = "idle";
+                            break;
                         }
+                        listOfHostInfo.add(P2.netsMap.get(oriHostName));
+
+                        // put the backUp host information
+                        String backUpHostName = Utility.getNextHostName(oriHostName, P2.netsMap);
+                        if (backUpHostName == null) {
+                            System.out.println("System error: failed to get backUp host name in lookUp table");
+                            state = "idle";
+                            break;
+                        }
+                        listOfHostInfo.add(P2.netsMap.get(backUpHostName));
+
+                        // store the tuple in remote tuple space both in original and backUp
+                        for (int i = 0; i < listOfHostInfo.size(); i++) {
+                            // construct the send message with out
+                            Message sendMessage = new Message();
+                            sendMessage.command = "out";
+                            sendMessage.success = false;
+                            sendMessage.tuple = tuple;
+
+                            // indicate original tuple space or backUp tuple space
+
+                            if (i == 0) {
+                                sendMessage.oriOrBu = Const.ORI;
+                            } else {
+                                sendMessage.oriOrBu = Const.BU;
+                            }
+
+                            // get remote host network info
+                            NetsEntry remoteNetsEntry = listOfHostInfo.get(i);
+                            String remoteIpAddr = remoteNetsEntry.ipAddr;
+                            int remotePortNum = remoteNetsEntry.portNum;
+
+                            // connect to the remote host
+                            try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                            {
+
+                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                )
+                                {
+                                    // send the message to remote server
+                                    out.writeObject(sendMessage);
+                                    System.out.println("Client: send the tuple to the host with IP " + remoteIpAddr);
+
+                                    // construct the received object
+                                    Message receivedMessage = null;
+
+                                    try {
+                                        if ((receivedMessage = (Message) in.readObject()) != null) {
+                                            if (receivedMessage.command.equals("out") && receivedMessage.success) {
+                                                System.out.println("put tuple " + tuple.toString() + " on " + remoteIpAddr);
+                                            } else {
+                                                System.out.println("Error: remote server failed to put the given tuple");
+                                            }
+                                        }
+                                    } catch (ClassNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                System.out.println("Error: failed to connect with remote host");
+                                System.out.println("Help: please wait remote host to reboot");
+                            }
+                        }
+
                         state = "idle";
                         break;
                     }
@@ -276,51 +369,84 @@ public class Client {
                             // construct the tuple
                             List<Object> tuple = parserEntry.tuple;
 
-                            // hash the tuple to get the host information
-                            int hostId_rd = Utility.hashToId(tuple, P2.netsMap.size());
-//                        System.out.println("host id is " + hostId);
-//                        System.out.println("host name is " + P2.netsMap.get(hostId).hostName
-//                                + "host ip is " + P2.netsMap.get(hostId).ipAddr
-//                                + "host port is " + P2.netsMap.get(hostId).portNum);
-                            String remoteIpAddr = P2.netsMap.get(hostId_rd).ipAddr;
-                            int remotePortNum = P2.netsMap.get(hostId_rd).portNum;
+                            // hash the tuple to get the slot id
+                            int slotId = Utility.hashToSlotId(tuple);
 
-                            // connect to the remote host
-                            try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
-                            {
+                            // create a list to store the host information
+                            List<NetsEntry> listOfHostInfo = new ArrayList<>();
 
-                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                                )
-                                {
-                                    // construct the send message with out
-                                    Message sendMessage = new Message();
-                                    sendMessage.command = "rd";
-                                    sendMessage.tuple = tuple;
+                            // put the original host information
+                            String oriHostName = P2.LUT.get(slotId);
+                            if (oriHostName == null) {
+                                System.out.println("System error: failed to get original host name in lookUp table");
+                                state = "idle";
+                                break;
+                            }
+                            listOfHostInfo.add(P2.netsMap.get(oriHostName));
 
-                                    // send the message to remote server
-                                    out.writeObject(sendMessage);
-                                    System.out.println("Client: send \"rd\" message with the tuple "
-                                            + tuple.toString()
-                                            + " to the host with IP " + remoteIpAddr);
+                            // put the backUp host information
+                            String backUpHostName = Utility.getNextHostName(oriHostName, P2.netsMap);
+                            if (backUpHostName == null) {
+                                System.out.println("System error: failed to get backUp host name in lookUp table");
+                                state = "idle";
+                                break;
+                            }
+                            listOfHostInfo.add(P2.netsMap.get(backUpHostName));
 
-                                    // construct the received object
-                                    Message receivedMessage = null;
+                            // store the tuple in remote tuple space both in original and backUp
+                            for (int i = 0; i < listOfHostInfo.size(); i++) {
+                                // construct the send message with rd
+                                Message sendMessage = new Message();
+                                sendMessage.command = "rd";
+                                sendMessage.success = false;
+                                sendMessage.tuple = tuple;
 
-                                    try {
-                                        if ((receivedMessage = (Message) in.readObject()) != null) {
-                                            if (receivedMessage.success != true) {
-                                                System.out.println("Error: remoted server failed to read the given tuple");
-                                            } else if (receivedMessage.command.equals("rd")) {
-                                                System.out.println("Client: read tuple " + receivedMessage.tuple.toString() + " on " + remoteIpAddr);
-                                            }
-                                        }
-                                    } catch (ClassNotFoundException e) {
-                                        e.printStackTrace();
-                                    }
+                                // indicate original tuple space or backUp tuple space
+
+                                if (i == 0) {
+                                    sendMessage.oriOrBu = Const.ORI;
+                                } else {
+                                    sendMessage.oriOrBu = Const.BU;
                                 }
-                            } catch (Exception e) {
-                                e.printStackTrace();
+
+                                // get remote host network info
+                                NetsEntry remoteNetsEntry = listOfHostInfo.get(i);
+                                String remoteIpAddr = remoteNetsEntry.ipAddr;
+                                int remotePortNum = remoteNetsEntry.portNum;
+
+                                // connect to the remote host
+                                try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                                {
+                                    try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                    )
+                                    {
+                                        // send the message to remote server
+                                        out.writeObject(sendMessage);
+                                        System.out.println("Client: send \"rd\" message with the tuple "
+                                                + tuple.toString()
+                                                + " to the host with IP " + remoteIpAddr);
+
+                                        // construct the received object
+                                        Message receivedMessage = null;
+
+                                        try {
+                                            if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                if (receivedMessage.command.equals("rd") && receivedMessage.success) {
+                                                    System.out.println("read tuple " + tuple.toString() + " on " + remoteIpAddr);
+                                                } else {
+                                                    System.out.println("Error: remote server failed to put the given tuple");
+                                                }
+                                            }
+                                        } catch (ClassNotFoundException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    System.out.println("Error: failed to connect with remote host");
+                                    System.out.println("Help: please wait remote host to reboot");
+                                }
                             }
                         } else {
                             // broadcast all the host
@@ -357,7 +483,12 @@ public class Client {
                                 // if user A uses the client to do the implicit type match first, e.g. rd(?i:int)
                                 // then another user B uses the client to put out(1) into the tuple space
                                 // user A's client still gets stuck unless user A's console keeps printing stuff...
-                                System.out.print("");
+                                try {
+                                    Thread.sleep(100);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+
                                 if (!Client.broadcastQueue.isEmpty()) {
                                     receivedMessage = Client.broadcastQueue.peek();
                                 }
@@ -395,51 +526,84 @@ public class Client {
                             // construct the tuple
                             List<Object> tuple = parserEntry.tuple;
 
-                            // hash the tuple to get the host information
-                            int hostId_rd = Utility.hashToId(tuple, P2.netsMap.size());
-//                        System.out.println("host id is " + hostId);
-//                        System.out.println("host name is " + P2.netsMap.get(hostId).hostName
-//                                + "host ip is " + P2.netsMap.get(hostId).ipAddr
-//                                + "host port is " + P2.netsMap.get(hostId).portNum);
-                            String remoteIpAddr = P2.netsMap.get(hostId_rd).ipAddr;
-                            int remotePortNum = P2.netsMap.get(hostId_rd).portNum;
+                            // hash the tuple to get the slot id
+                            int slotId = Utility.hashToSlotId(tuple);
 
-                            // connect to the remote host
-                            try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
-                            {
+                            // create a list to store the host information
+                            List<NetsEntry> listOfHostInfo = new ArrayList<>();
 
-                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                                )
-                                {
-                                    // construct the send message with out
-                                    Message sendMessage = new Message();
-                                    sendMessage.command = "in";
-                                    sendMessage.tuple = tuple;
+                            // put the original host information
+                            String oriHostName = P2.LUT.get(slotId);
+                            if (oriHostName == null) {
+                                System.out.println("System error: failed to get original host name in lookUp table");
+                                state = "idle";
+                                break;
+                            }
+                            listOfHostInfo.add(P2.netsMap.get(oriHostName));
 
-                                    // send the message to remote server
-                                    out.writeObject(sendMessage);
-                                    System.out.println("Client: send \"in\" message with the tuple "
-                                            + tuple.toString()
-                                            + " to the host with IP " + remoteIpAddr);
+                            // put the backUp host information
+                            String backUpHostName = Utility.getNextHostName(oriHostName, P2.netsMap);
+                            if (backUpHostName == null) {
+                                System.out.println("System error: failed to get backUp host name in lookUp table");
+                                state = "idle";
+                                break;
+                            }
+                            listOfHostInfo.add(P2.netsMap.get(backUpHostName));
 
-                                    // construct the received object
-                                    Message receivedMessage = null;
+                            // store the tuple in remote tuple space both in original and backUp
+                            for (int i = 0; i < listOfHostInfo.size(); i++) {
+                                // construct the send message with rd
+                                Message sendMessage = new Message();
+                                sendMessage.command = "in";
+                                sendMessage.success = false;
+                                sendMessage.tuple = tuple;
 
-                                    try {
-                                        if ((receivedMessage = (Message) in.readObject()) != null) {
-                                            if (receivedMessage.success != true) {
-                                                System.out.println("Error: remoted server failed to read the given tuple");
-                                            } else if (receivedMessage.command.equals("in")) {
-                                                System.out.println("Client: get tuple " + receivedMessage.tuple.toString() + " on " + remoteIpAddr);
-                                            }
-                                        }
-                                    } catch (ClassNotFoundException e) {
-                                        e.printStackTrace();
-                                    }
+                                // indicate original tuple space or backUp tuple space
+
+                                if (i == 0) {
+                                    sendMessage.oriOrBu = Const.ORI;
+                                } else {
+                                    sendMessage.oriOrBu = Const.BU;
                                 }
-                            } catch (Exception e) {
-                                e.printStackTrace();
+
+                                // get remote host network info
+                                NetsEntry remoteNetsEntry = listOfHostInfo.get(i);
+                                String remoteIpAddr = remoteNetsEntry.ipAddr;
+                                int remotePortNum = remoteNetsEntry.portNum;
+
+                                // connect to the remote host
+                                try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                                {
+                                    try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                    )
+                                    {
+                                        // send the message to remote server
+                                        out.writeObject(sendMessage);
+                                        System.out.println("Client: send \"in\" message with the tuple "
+                                                + tuple.toString()
+                                                + " to the host with IP " + remoteIpAddr);
+
+                                        // construct the received object
+                                        Message receivedMessage = null;
+
+                                        try {
+                                            if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                if (receivedMessage.command.equals("in") && receivedMessage.success) {
+                                                    System.out.println("get tuple " + tuple.toString() + " on " + remoteIpAddr);
+                                                } else {
+                                                    System.out.println("Error: remote server failed to put the given tuple");
+                                                }
+                                            }
+                                        } catch (ClassNotFoundException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    System.out.println("Error: failed to connect with remote host");
+                                    System.out.println("Help: please wait remote host to reboot");
+                                }
                             }
                         } else {
                             // broadcast all the host

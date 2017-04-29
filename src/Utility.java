@@ -1,7 +1,9 @@
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -364,12 +366,35 @@ public abstract class Utility {
 //        System.out.println("sum: " + sum);
         hostId = sum % numOfHost;
 
-
         return hostId;
     }
 
     /**
+     * hash the tuple to slot id
+     * @param tuple
+     * @return slot id
+     */
+    public static int hashToSlotId(List<Object> tuple) {
+        // check the input
+        if (tuple == null || tuple.size() == 0) return -1;
+
+        // slot id
+        int slotId = 0;
+
+        // convert the tuple to hash string
+        String hashString = hashTuple(tuple);
+
+        for (int i = 0; i < hashString.length(); i++) {
+            String hex = Character.toString(hashString.charAt(i));
+            slotId += Integer.parseInt(hex, 16);
+        }
+
+        return slotId;
+    }
+
+    /**
      * convert tuple to hash string
+     * MD5 -> 16 bytes or 128 bits
      * @param tuple
      * @return hash string
      */
@@ -417,16 +442,50 @@ public abstract class Utility {
     }
 
     /**
+     * convert the hostName to netsMap's inserted index
+     * @param key
+     * @param netsMap
+     * @return index
+     */
+    public static int netsMapKeyToIndex(String key, LinkedHashMap<String, NetsEntry> netsMap) {
+        if (netsMap == null || key == null) return -1;
+
+        List<String> listOfHostName = new ArrayList<>(netsMap.keySet());
+
+        return listOfHostName.indexOf(key);
+    }
+
+    /**
+     * get the next host name in the netsMap
+     * @param curHostName
+     * @param netsMap
+     * @return next host name
+     */
+    public static String getNextHostName(String curHostName, LinkedHashMap<String, NetsEntry> netsMap) {
+        if (netsMap == null || curHostName == null) return null;
+
+        int curHostIndex = netsMapKeyToIndex(curHostName, netsMap);
+        if (curHostIndex < 0) {
+            System.out.println("System error: wrong index for host name");
+            return null;
+        }
+
+        int nextHostIndex = (curHostIndex + 1) % netsMap.size();
+
+        return netsMapIndexToKey(nextHostIndex, netsMap);
+    }
+
+    /**
      * unit test
      * @param args
      */
     public static void main(String[] args) {
 //        // hash function
 //        List<Object> l = new ArrayList<>();
-//        l.add(new Integer(6));
+//        l.add(new Integer(10000000));
 //        l.add(new String("def"));
 //
-//        int hostId = Utility.hashToId(l, 3);
+//        int hostId = Utility.hashToSlotId(l);
 //        System.out.println("host id: " + hostId);
 
 //        // isInteger function
@@ -467,5 +526,84 @@ public abstract class Utility {
 //        ParserEntry parserEntry = Utility.parser(in);
 //        System.out.println("command is " + parserEntry.commandName);
 
+        // get next host name
+//        LinkedHashMap<String, NetsEntry> netsMap = new LinkedHashMap<>();
+//        netsMap.put("h1", new NetsEntry());
+//        netsMap.put("h2", new NetsEntry());
+//        netsMap.put("h3", new NetsEntry());
+//        netsMap.put("h4", new NetsEntry());
+//
+//        String curHostName = "h4";
+//        String nextHostName = Utility.getNextHostName(curHostName, netsMap);
+//        System.out.println("cur host name: " + curHostName + " next host name: " + nextHostName);
+
     }
 }
+
+class ParserEntry {
+    // command name
+    String commandName = null;
+
+    // for add command
+    // store remote host information
+    List<String> remoteHostsInfo = null;
+
+    // for non-add command
+    // e.g. out, rd, in
+    // store the tuple
+    List<Object> tuple = null;
+}
+
+class NetsEntry implements Serializable {
+    int hostId;
+    String hostName;
+    String ipAddr;
+    int portNum;
+}
+
+class Message implements Serializable {
+    // control field
+    String command = null;
+    boolean success = false;
+    Const oriOrBu = null; // indicate if the tuple should put into the original tuple space or backUp tuple space
+
+    // network information
+    String ipAddr = null;
+    int portNum;
+
+    // data field
+    LinkedHashMap netsMap = null; // store the host information
+    List<Object> tuple = null;
+    List<String> LUT = null; // look up table
+    Map<String, List<Integer>> RLUT = null; // reversed look up table
+
+}
+
+enum Const {
+    // tuple space type
+    STRING,
+    INTEGER,
+    FLOAT,
+
+    // user command
+    // add related
+    ADD,
+    DEL,
+    OUT,
+    IN,
+    RD,
+
+    // system command
+    REP_NETS, // for add, replace the old nets with new nets received
+    REP_BU, // for del, replace the old backup tuple space with new backup received, redistribute old backup
+    REP_LUTS, // for add, replace the old lookup tables with the new received, request the data
+
+    // tuple space control
+    ORI, // backUp tuple space
+    BU // original tuple space
+    ;
+
+}
+
+
+

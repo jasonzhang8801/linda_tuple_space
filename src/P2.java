@@ -1,4 +1,5 @@
 import java.io.*;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -20,19 +21,27 @@ public class P2 {
     // nets map to store all the hosts' information
     public static LinkedHashMap<String, NetsEntry> netsMap = null;
     // tuple space to store all the tuples
-    public static ConcurrentHashMap<String, List<TupleSpaceEntry>> tupleSpace = new ConcurrentHashMap<>();
+    // K: slot#, V: list of tuple
+    public static ConcurrentHashMap<Integer, List<TupleSpaceEntry>> tupleSpace = new ConcurrentHashMap<>();
     // backup tuple space to store all the backup tuples
-    public static ConcurrentHashMap<String, List<TupleSpaceEntry>> backUpTupleSpace = new ConcurrentHashMap<>();
+    // K: slot#, V: list of tuple
+    public static ConcurrentHashMap<Integer, List<TupleSpaceEntry>> backUpTupleSpace = new ConcurrentHashMap<>();
 
     // lookUp table
+    // index: slot#, val: hostName
     public static List<String> LUT = Collections.synchronizedList(new ArrayList<>());
     // reversed lookUp table
+    // key: hostName, val: list of slot#
     public static Map<String, List<Integer>> RLUT = new ConcurrentHashMap<>();
 
     // the local directory for nets map, tuple space and backup tuple space
     public static String netsMapDir;
     public static String tupleSpaceDir;
-    public static String backUpTupleSpaceDir;
+
+    //
+    private String infoDirStr = null;
+    private String netsFileStr = null;
+    private String tuplesFileStr = null;
 
     // the local host information
     public static String hostName = null;
@@ -58,49 +67,11 @@ public class P2 {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
-    // suppress compiler warning when hashmap assignment
-    public static void main(String args[]) {
-        // create a instance of P2
-        P2 p2 = new P2();
-
-        // assign host name
-        // check the user input
-        if (args == null || args.length != 1) {
-            System.out.println("Error: invalid parameter");
-            System.out.println("Help: please type the following command to start the program");
-            System.out.println("java P2 hostName");
-            return;
-        }
-
-        String hostName = args[0];
-
-        // check if the host name is valid
-        Pattern pattern = Pattern.compile("^[a-zA-Z][a-zA-Z0-9]*");
-        Matcher matcher = pattern.matcher(hostName);
-        if (!matcher.find()) {
-            System.out.println("Error: invalid host name");
-            System.out.println("Help: please review the following host naming convention");
-            System.out.println("Host name must start with English letters");
-            System.out.println("Host name only contains English letters and numbers");
-            return;
-        }
-
-        // set up the server
-        (new Thread(new Server(hostName))).start();
-
-        // load the nets
-        // to do ...
-        netsMap = new LinkedHashMap<>();
-
-        // nets info: /tmp/<userlogin>/linda/<hostname>/nets
-        // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
-        String infoDirStr = "/tmp/szhang/linda/" + hostName + "/";
-        String netsFileStr = "nets.txt";
-        String tuplesFileStr = "tuples.txt";
-        P2.netsMapDir = infoDirStr + netsFileStr;
-        P2.tupleSpaceDir = infoDirStr + tuplesFileStr;
-
+    /**
+     * initialize the directories and files, netsMap and tuples
+     * @return
+     */
+    private void initFileSys() {
         // clean up the nets.txt and tuples.txt
         Path netsPath = Paths.get(P2.netsMapDir);
         Path tuplesPath = Paths.get(P2.tupleSpaceDir);
@@ -153,38 +124,212 @@ public class P2 {
 
         // change the files' mode
         if (netsFile.setReadable(true, false) && netsFile.setWritable(true, false)) {
-            System.out.println("P2: successfully changed the file " + netsFileStr + " to 666");
+            System.out.println("System: successfully changed the file " + netsFileStr + " to 666");
         } else {
-            System.out.println("P2: failed change the file " + netsFileStr + " to 666");
+            System.out.println("System: failed change the file " + netsFileStr + " to 666");
         }
 
         if (tuplesFile.setReadable(true, false) && tuplesFile.setWritable(true, false)) {
-            System.out.println("P2: successfully changed the file " + tuplesFileStr + " to 666");
+            System.out.println("System: successfully changed the file " + tuplesFileStr + " to 666");
         } else {
-            System.out.println("P2: failed to change the file " + tuplesFileStr + " to 666");
+            System.out.println("System: failed to change the file " + tuplesFileStr + " to 666");
+        }
+    }
+
+    /**
+     * after failure, the local host reboots and update other hosts' netsMap
+     */
+    private void updatePort() {
+        // send the message to remote servers
+        // only update netsMap
+        // boolean flag to indicate if at least one remote host is alive in the cluster
+        boolean isCluster = false;
+
+        for (String hostName : P2.netsMap.keySet()) {
+
+            // send the message to the remote hosts except current one
+            if (!hostName.equals(P2.hostName)) {
+                String remoteIpAddr = P2.netsMap.get(hostName).ipAddr;
+                int remotePortNum = P2.netsMap.get(hostName).portNum;
+
+                try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                {
+                    try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                    )
+                    {
+                        // construct the merge message with add
+                        Message sendMessage = new Message();
+                        sendMessage.command = "update_port";
+                        sendMessage.success = false;
+                        sendMessage.netsMap = P2.netsMap;
+
+                        // send the message to remote server
+                        out.writeObject(sendMessage);
+                        System.out.println("Client: send the message with updated nets map to remote host with IP "
+                                + remoteIpAddr);
+
+                        // construct the received object
+                        Message receivedMessage = null;
+                        try {
+                            if ((receivedMessage = (Message) in.readObject()) != null) {
+                                if (receivedMessage.command.equals("update_port")  && receivedMessage.success) {
+                                    System.out.println("Client: successfully update port number at the host with IP: " + remoteIpAddr
+                                            + " port: " + remotePortNum );
+                                } else {
+                                    System.out.println("Error: failed to update port number at host with IP: " + remoteIpAddr
+                                            + " port: " + remotePortNum );
+                                }
+                            }
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    // update the boolean flag
+                    // there are still other hosts in the cluster
+                    isCluster = true;
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
-//        // store a empty tuple space into the file
-//        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.tupleSpaceDir))) {
-//            objOut.writeObject(new ConcurrentHashMap<String,List<TupleSpaceEntry>>());
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
+        // no hosts left in the cluster
+        if (!isCluster) {
+            System.out.println("System: no other hosts in the cluster");
+
+            // clean up the nets.txt and tuples.txt
+            Path netsPath = Paths.get(P2.netsMapDir);
+            Path tuplesPath = Paths.get(P2.tupleSpaceDir);
+            try {
+                Files.deleteIfExists(netsPath);
+                Files.deleteIfExists(tuplesPath);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println("System: clean up the local host file system ...");
+
+            // exit linda system
+            System.out.println("System: exiting ... ");
+            System.exit(0);
+
+        }
+
+        // update the netsMap into the file
+        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
+            objOut.writeObject(P2.netsMap);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    // suppress compiler warning when hashmap assignment
+    public static void main(String args[]) {
+        // create a instance of P2
+        P2 p2 = new P2();
+
+        // assign host name
+        // check the user input
+        if (args == null || args.length != 1) {
+            System.out.println("Error: invalid parameter");
+            System.out.println("Help: please type the following command to start the program");
+            System.out.println("java P2 hostName");
+            return;
+        }
+
+        String hostName = args[0];
+
+        // check if the host name is valid
+        Pattern pattern = Pattern.compile("^[a-zA-Z][a-zA-Z0-9]*");
+        Matcher matcher = pattern.matcher(hostName);
+        if (!matcher.find()) {
+            System.out.println("Error: invalid host name");
+            System.out.println("Help: please review the following host naming convention");
+            System.out.println("Host name must start with English letters");
+            System.out.println("Host name only contains English letters and numbers");
+            return;
+        }
+
+        // nets info: /tmp/<userlogin>/linda/<hostname>/nets
+        // tuples info: /tmp/<userlogin>/linda/<hostname>/tuples
+        String infoDirStr = "/tmp/szhang/linda/" + hostName + "/";
+        String netsFileStr = "nets.txt";
+        String tuplesFileStr = "tuples.txt";
+        p2.infoDirStr = infoDirStr;
+        p2.netsFileStr = netsFileStr;
+        p2.tuplesFileStr = tuplesFileStr;
+        P2.netsMapDir = infoDirStr + netsFileStr;
+        P2.tupleSpaceDir = infoDirStr + tuplesFileStr;
+
+        // check if the nets file exist in disk
+        File netsMapFile = new File(P2.netsMapDir);
+
+        if (!netsMapFile.exists()) {
+            // if netsMap file not exist
+            System.out.println("System: never see this host before");
+            // init netMaps in memory
+            P2.netsMap = new LinkedHashMap<>();
+            p2.initFileSys();
+        } else {
+            // if netsMap file exist
+            System.out.println("System: saw this host before");
+
+            // read the netsMap into the memory
+            try (ObjectInputStream objIn = new ObjectInputStream(new FileInputStream(P2.netsMapDir))) {
+                 P2.netsMap = (LinkedHashMap<String, NetsEntry>) objIn.readObject();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // set up the server
+        (new Thread(new Server(hostName))).start();
 
         // print host ip and port
-        while (ipAddr == null || portNum == -1) {
+        while (P2.ipAddr == null || P2.portNum == -1) {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
-        System.out.println(ipAddr + " at port number: " + portNum);
+        System.out.println(P2.ipAddr + " at port number: " + P2.portNum);
+
+        // write netsMap back to the disk
+        try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
+            objOut.writeObject(P2.netsMap);
+            System.out.println("System: write netsMap into disk");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // check the netsMap's size
+        // when size > 1, the local host was in the cluster
+        // when size == 1, the local host wasn't in the cluster before
+        if (P2.netsMap.size() > 1) {
+            System.out.println("System: the local host is in the cluster before");
+            // LUT and RLUT don't change during failure
+            // ask other hosts to update the latest port number
+            p2.updatePort();
+
+            // however, tuple space need to be updated
+            // use the local LUT and RLUT to redistribute the tuples
+            // ASSUMPTION: during failure, no host join and leave
+            // TODO ...
 
 
-        // initialize lookUp table and reversed lookUp table
-        if (!p2.initLUTs()) {
-            System.out.println("Error: failed to initialize the lookUp table");
+        } else if (P2.netsMap.size() == 1) {
+            System.out.println("System: the local host is not in the cluster before");
+
+            // initialize lookUp table and reversed lookUp table
+            if (!p2.initLUTs()) {
+                System.out.println("Error: failed to initialize the lookUp table");
+            }
+        } else {
+            System.out.println("System error: netsMap should >= 1");
         }
 
         // create the client in the same thread with P2
