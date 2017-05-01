@@ -5,8 +5,10 @@ import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -95,12 +97,318 @@ class ServerWorker implements Runnable {
                             System.out.println("Server: send back message with the local nets map");
                             break;
                         }
-                        case "merge": {
-                            // validate the received message
-                            if (receivedMessage.netsMap == null) {
-                                System.out.println("System error: not received valid merged nets map");
+                        case "add_internal": {
+                            // the local host is new one which will be added into the cluster
+                            // need to redistribute the tuples
+
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
+                            // validate the recevied message
+                            if (receivedMessage.LUT == null) {
+                                System.out.println("System error: not received valid updated lookUp table");
+                            } else if (receivedMessage.RLUT == null) {
+                                System.out.println("System error: not received valid updated reversed lookUp table");
                                 return;
-                            } else if (receivedMessage.LUT == null) {
+                            }
+
+                            P2.LUT = receivedMessage.LUT;
+                            P2.RLUT = receivedMessage.RLUT;
+
+                            // add local host into the reversed lookUp table
+                            P2.RLUT.put(P2.hostName, new ArrayList<>());
+
+                            // calculate the total number of host in updated netsMap
+                            int numOfHost = P2.netsMap.size();
+
+                            // redistribute tuple in original tuple space
+                            // update LUT and RLUT
+                            for (String remoteHostName : P2.netsMap.keySet()) {
+
+                                // skip the local host
+                                if (remoteHostName.equals(P2.hostName)) continue;
+
+                                // remote host IP and port number
+                                String remoteIpAddr = P2.netsMap.get(remoteHostName).ipAddr;
+                                int remotePortNum = P2.netsMap.get(remoteHostName).portNum;
+
+                                // truncate the given host's list of slot id
+                                System.out.println("Remote host name is " + remoteHostName);
+
+                                List<Integer> listOfTotalSlotId = P2.RLUT.get(remoteHostName);
+                                int sizeOfTotalSlotId = listOfTotalSlotId.size();
+
+                                System.out.println("total size of list of slot is " + sizeOfTotalSlotId);
+
+                                List<Integer> listOfDelSlotId = new ArrayList<>(listOfTotalSlotId.subList(0, sizeOfTotalSlotId / numOfHost));
+
+                                System.out.println("del size of list of slot is " + listOfDelSlotId.size());
+
+                                List<Integer> listOfRestSlotId = new ArrayList<>(listOfTotalSlotId.subList(sizeOfTotalSlotId / numOfHost, sizeOfTotalSlotId));
+
+                                System.out.println("rest size of list of slot is " + listOfRestSlotId.size());
+
+                                // update the given host in RLUT
+                                P2.RLUT.put(remoteHostName, listOfRestSlotId);
+
+                                // update the local host in RLUT
+                                P2.RLUT.get(P2.hostName).addAll(listOfDelSlotId);
+
+                                // update the given host in LUT
+                                for (int i = 0; i < listOfDelSlotId.size(); i++) {
+                                    int slotId = listOfDelSlotId.get(i);
+                                    P2.LUT.set(slotId, P2.hostName);
+                                }
+
+                                // WARNING
+                                // server-server communication
+                                try (Socket socket = new Socket(remoteIpAddr, remotePortNum);) {
+
+                                    try(ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                                        ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream());) {
+
+                                        // construct the message with cmd del_slot
+                                        Message sendMessageAdd = new Message();
+                                        sendMessageAdd.command = "del_slot";
+                                        sendMessageAdd.success = false;
+                                        sendMessageAdd.listOfSlotId = listOfDelSlotId;
+                                        sendMessageAdd.tupleSpace = null;
+                                        sendMessageAdd.oriOrBu = Const.ORI;
+
+                                        // send message
+                                        objOut.writeObject(sendMessageAdd);
+
+                                        // construct received message
+                                        Message receivedMessageAdd = null;
+
+                                        if ((receivedMessageAdd = (Message) objIn.readObject()) != null) {
+                                            if (receivedMessageAdd.tupleSpace != null && receivedMessageAdd.success) {
+                                                P2.tupleSpace.putAll(receivedMessageAdd.tupleSpace);
+                                                System.out.println("Server: successfully put tuples from the host with IP "
+                                                        + remoteIpAddr +  " into tuple space");
+                                            } else {
+                                                System.out.println("Server: failed to redistribute tuples at host with IP "
+                                                        + remoteIpAddr);
+                                            }
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+
+                            // backup the tuple space
+                            // back up the tuple space
+                            // determine which host is the backUp host
+                            System.out.println("Server: back up ...");
+                            String backUpHostName = Utility.getNextHostName(P2.hostName, P2.netsMap);
+                            String backUpIpAddr = P2.netsMap.get(backUpHostName).ipAddr;
+                            int backUpPortNum = P2.netsMap.get(backUpHostName).portNum;
+
+                            try (Socket socket = new Socket(backUpIpAddr, backUpPortNum)) {
+
+                                try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream())) {
+
+                                    // construct send message
+                                    Message sendMessageBackUp = new Message();
+                                    sendMessageBackUp.command = "backup";
+                                    sendMessageBackUp.oriOrBu = Const.BU;
+                                    sendMessageBackUp.tupleSpace = P2.tupleSpace;
+                                    sendMessageBackUp.success = false;
+
+                                    objOut.writeObject(sendMessageBackUp);
+
+                                    // construct received message
+                                    Message receivedMessageBackUp = null;
+
+                                    if ((receivedMessageBackUp = (Message) objIn.readObject()) != null) {
+                                        if (receivedMessageBackUp.command.equals("backup") && receivedMessageBackUp.success) {
+                                            System.out.println("Server: successfully back up tuple space at backup host with IP "
+                                                    + backUpIpAddr);
+                                        } else {
+                                            System.out.println("Server: failed back up tuple space at host with IP "
+                                                    + backUpIpAddr);
+                                        }
+                                    }
+                                }
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
+                            // update remote hosts LUT and RLUT
+                            for (String remoteHostName : P2.netsMap.keySet()) {
+
+                                // skip the local host
+                                if (remoteHostName.equals(P2.hostName)) continue;
+
+                                // remote host IP and port number
+                                String remoteIpAddr = P2.netsMap.get(remoteHostName).ipAddr;
+                                int remotePortNum = P2.netsMap.get(remoteHostName).portNum;
+
+                                try (Socket socket = new Socket(remoteIpAddr, remotePortNum)) {
+
+                                    try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                                         ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream())) {
+
+                                        // construct the message with cmd replace_luts
+                                        Message sendMessageRep = new Message();
+                                        sendMessageRep.command = "replace_luts";
+                                        sendMessageRep.LUT = P2.LUT;
+                                        sendMessageRep.RLUT = P2.RLUT;
+                                        sendMessageRep.success = false;
+
+                                        // send the message
+                                        objOut.writeObject(sendMessageRep);
+
+                                        // construct the received message
+                                        Message receivedMessageRep = null;
+
+                                        if ((receivedMessageRep = (Message) objIn.readObject()) != null) {
+                                            if (receivedMessageRep.command.equals("replace_luts") && receivedMessageRep.success) {
+                                                System.out.println("Server: successfully update lookUp table and reversed lookUp table "
+                                                        + "at the host with IP " + remoteIpAddr);
+                                            } else {
+                                                System.out.println("Server: failed to update lookUp table and reversed lookUp table "
+                                                        + "at the host with IP " + remoteIpAddr);
+                                            }
+                                        }
+
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+
+                            }
+
+                            // construct the ACK message
+                            receivedMessage.success = true;
+                            receivedMessage.LUT = null;
+                            receivedMessage.RLUT = null;
+
+                            out.writeObject(receivedMessage);
+                            System.out.println("Server: successfully redistribute the tuple when adding new hosts");
+
+                            break;
+                        }
+                        case "del_slot": {
+                            // redistribute
+                            // remove the given slot into tmpTupleSpace
+                            // delete the given slot from the original tuple space
+                            // send back the tmpTupleSpace
+
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
+                            //validate the received message
+                            if (receivedMessage.listOfSlotId == null) {
+                                System.out.println("System error: not received valid tuple space which should be deleted");
+                                return;
+                            } else if (receivedMessage.oriOrBu == null) {
+                                System.out.println("System error: not indicate which tuple space which should be deleted");
+                                return;
+                            }
+
+                            List<Integer> listOfSlotId = receivedMessage.listOfSlotId;
+
+                            ConcurrentHashMap<Integer, List<TupleSpaceEntry>> tmpTupleSpace = new ConcurrentHashMap<>();
+
+                            for (int i = 0; i < listOfSlotId.size(); i++) {
+                                int slotId = listOfSlotId.get(i);
+
+                                if (P2.tupleSpace.containsKey(slotId)) {
+                                    tmpTupleSpace.put(slotId, P2.tupleSpace.get(slotId));
+
+                                } else {
+                                    System.out.println("System error: the tuple space doesn't contain the given slot");
+                                    return;
+                                }
+
+                                P2.tupleSpace.remove(slotId);
+                            }
+
+                            // construct the message
+                            receivedMessage.success = true;
+                            receivedMessage.listOfSlotId = null;
+
+                            // if the original tuple space, send back the tmpTupleSpace and ACK
+                            // otherwise, just send ACK
+                            if (receivedMessage.oriOrBu == Const.ORI) {
+                                receivedMessage.tupleSpace = tmpTupleSpace;
+                                out.writeObject(receivedMessage);
+                                System.out.println("Server: send back the slots from original tuple space");
+
+                                // back up the tuple space
+                                // determine which host is the backUp host
+                                System.out.println("Server: back up ...");
+                                String backUpHostName = Utility.getNextHostName(P2.hostName, P2.netsMap);
+                                String backUpIpAddr = P2.netsMap.get(backUpHostName).ipAddr;
+                                int backUpPortNum = P2.netsMap.get(backUpHostName).portNum;
+
+                                try (Socket socket = new Socket(backUpIpAddr, backUpPortNum)) {
+
+                                    try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                                        ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream())) {
+
+                                        // construct send message
+                                        Message sendMessageBackUp = new Message();
+                                        sendMessageBackUp.command = "backup";
+                                        sendMessageBackUp.oriOrBu = Const.BU;
+                                        sendMessageBackUp.tupleSpace = P2.tupleSpace;
+                                        sendMessageBackUp.success = false;
+
+                                        objOut.writeObject(sendMessageBackUp);
+
+                                        // construct received message
+                                        Message receivedMessageBackUp = null;
+
+                                        if ((receivedMessageBackUp = (Message) objIn.readObject()) != null) {
+                                            if (receivedMessageBackUp.command.equals("backup") && receivedMessageBackUp.success) {
+                                                System.out.println("Server: successfully back up tuple space at backup host with IP "
+                                                + backUpIpAddr);
+                                            } else {
+                                                System.out.println("Server: failed back up tuple space at host with IP "
+                                                        + backUpIpAddr);
+                                            }
+                                        }
+                                    }
+
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+
+                            break;
+                        }
+                        case "put_slot": {
+                            // redistribute
+                            break;
+                        }
+                        case "backup": {
+                            // backup the tuple space at backUpTupleSpace
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
+                            if (receivedMessage.tupleSpace == null) {
+                                System.out.println("System error: not receive valid tuple space for backup");
+                            } else if (receivedMessage.oriOrBu == null) {
+                                System.out.println("System error: not indicate which tuple space for backup");
+                            }
+
+                            P2.backUpTupleSpace = receivedMessage.tupleSpace;
+
+                            // construct send message
+                            receivedMessage.success = true;
+                            receivedMessage.tupleSpace = null;
+
+                            out.writeObject(receivedMessage);
+                            System.out.println("Server: successfully back up the tuple space at local host with IP "
+                                    + P2.ipAddr);
+
+                            break;
+                        }
+                        case "replace_luts": {
+                            // validate the received message
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+                            if (receivedMessage.LUT == null) {
                                 System.out.println("System error: not received valid updated lookUp table");
                                 return;
                             } else if (receivedMessage.RLUT == null) {
@@ -108,45 +416,101 @@ class ServerWorker implements Runnable {
                                 return;
                             }
 
-                            System.out.println("Server: received message with command " + receivedMessage.command);
-                            // update the current host's netsMap, LUT and RLUT
-                            P2.netsMap = receivedMessage.netsMap;
+                            // update the current host's LUT and RLUT
                             P2.LUT = receivedMessage.LUT;
                             P2.RLUT = receivedMessage.RLUT;
 
-                            // test only
-                            // print out the nets map
-//                            int hostId = 0;
-//                            for (String hostName : P2.netsMap.keySet()) {
-//                                System.out.println("Merged nets");
-//                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
-//                            }
-
                             // send back ACK message
                             receivedMessage.success = true;
-                            receivedMessage.netsMap = null;
                             receivedMessage.LUT = null;
                             receivedMessage.RLUT = null;
                             out.writeObject(receivedMessage);
 
-                            // update the netsMap into the file
-                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
-                                objOut.writeObject(P2.netsMap);
-                            } catch (IOException e) {
+                            System.out.println("Server: update the local lookUp table and reversed lookUp table");
+                            break;
+                        }
+                        case "replace_luts_init": {
+                            // validate the received message
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+                            if (receivedMessage.LUT == null) {
+                                System.out.println("System error: not received valid updated lookUp table");
+                                return;
+                            } else if (receivedMessage.RLUT == null) {
+                                System.out.println("System error: not received valid updated reversed lookUp table");
+                                return;
+                            }
+
+                            // update the current host's LUT and RLUT
+                            P2.LUT = receivedMessage.LUT;
+                            P2.RLUT = receivedMessage.RLUT;
+
+                            // initialize the tuple space according to reversed lookUp table
+                            List<Integer> listOfSlotId = P2.RLUT.get(P2.hostName);
+                            for (int i = 0; i < listOfSlotId.size(); i++) {
+                                int slotId = listOfSlotId.get(i);
+                                P2.tupleSpace.put(slotId, new ArrayList<>());
+                            }
+                            System.out.println("Server: initialize the tuple space");
+
+                            // back up the tuple space
+                            // determine which host is the backUp host
+                            System.out.println("Server: back up ...");
+                            String backUpHostName = Utility.getNextHostName(P2.hostName, P2.netsMap);
+                            String backUpIpAddr = P2.netsMap.get(backUpHostName).ipAddr;
+                            int backUpPortNum = P2.netsMap.get(backUpHostName).portNum;
+
+                            try (Socket socket = new Socket(backUpIpAddr, backUpPortNum)) {
+
+                                try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream())) {
+
+                                    // construct send message
+                                    Message sendMessageBackUp = new Message();
+                                    sendMessageBackUp.command = "backup";
+                                    sendMessageBackUp.oriOrBu = Const.BU;
+                                    sendMessageBackUp.tupleSpace = P2.tupleSpace;
+                                    sendMessageBackUp.success = false;
+
+                                    objOut.writeObject(sendMessageBackUp);
+
+                                    // construct received message
+                                    Message receivedMessageBackUp = null;
+
+                                    if ((receivedMessageBackUp = (Message) objIn.readObject()) != null) {
+                                        if (receivedMessageBackUp.command.equals("backup") && receivedMessageBackUp.success) {
+                                            System.out.println("Server: successfully back up tuple space at backup host with IP "
+                                                    + backUpIpAddr);
+                                        } else {
+                                            System.out.println("Server: failed back up tuple space at host with IP "
+                                                    + backUpIpAddr);
+                                        }
+                                    }
+                                }
+
+                            } catch (Exception e) {
                                 e.printStackTrace();
                             }
 
-                            System.out.println("Server: update the local nets map and send back ACK message");
+                            // send back ACK message
+                            receivedMessage.success = true;
+                            receivedMessage.LUT = null;
+                            receivedMessage.RLUT = null;
+                            out.writeObject(receivedMessage);
+
+                            System.out.println("Server: update the local lookUp table and reversed lookUp table and "
+                                    + "initialize the tuple space");
+
                             break;
                         }
-                        case "update_port": {
+                        case "replace_nets": {
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
                             // validate the received message
                             if (receivedMessage.netsMap == null) {
                                 System.out.println("System error: not received valid updated nets map");
                                 return;
                             }
 
-                            System.out.println("Server: received message with command " + receivedMessage.command);
                             // update the current host's netsMap
                             P2.netsMap = receivedMessage.netsMap;
 
@@ -173,7 +537,35 @@ class ServerWorker implements Runnable {
                             System.out.println("Server: update the local nets map and send back ACK message");
                             break;
                         }
+                        case "req_ts": {
+                            // after failure, the host request for original and backUp tuple space for recovery
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
+                            // validate the received message
+                            if (receivedMessage.oriOrBu == null) {
+                                System.out.println("Server: failed to indicate which tuple space is requested");
+                            }
+
+                            // construct the send message
+                            if (receivedMessage.oriOrBu == Const.ORI) {
+                                receivedMessage.tupleSpace = P2.tupleSpace;
+                                System.out.println("Server: remote host request for original tuple space");
+                            } else if (receivedMessage.oriOrBu == Const.BU) {
+                                receivedMessage.tupleSpace = P2.backUpTupleSpace;
+                                System.out.println("Server: remote host request for backUp tuple space");
+                            } else {
+                                System.out.println("Server: invalid tuple space request");
+                            }
+
+                            receivedMessage.success = true;
+                            out.writeObject(receivedMessage);
+                            System.out.println("Server: send back the tuple space to the request host");
+                        }
                         case "delete": {
+                            System.out.println("Server: received message with command " + receivedMessage.command);
+
+                            // validate the received message
+
                             break;
                         }
                         case "out": {
@@ -202,23 +594,13 @@ class ServerWorker implements Runnable {
                             // get the slot id by hashing the tuple
                             int slotId = Utility.hashToSlotId(receivedTuple);
 
-                            if (!curTupleSpace.containsKey(slotId)) {
-                                // the first tuple with the slot id
-                                // create a new tuple entry
-                                TupleSpaceEntry tupleSpaceEntry = new TupleSpaceEntry();
-                                tupleSpaceEntry.count = 1;
-                                tupleSpaceEntry.tuple = receivedTuple;
+                            // after initialization, each host's tuple space should contain the slot
+                            // the slot may be empty
+                            if (curTupleSpace.containsKey(slotId)) {
 
-                                // store the tuple space entry into the new linked list
-                                List<TupleSpaceEntry> tupleLinkedList = new LinkedList<>();
-                                tupleLinkedList.add(tupleSpaceEntry);
+                                // check if the tuple in the slot
+                                boolean isInSlot = false;
 
-                                // put the tuple linked list into the tuple space
-                                curTupleSpace.put(slotId, tupleLinkedList);
-
-                                System.out.println("Server: new tuple " + receivedMessage.tuple.toString()
-                                        + " in the tuple space with count " + tupleSpaceEntry.count);
-                            } else {
                                 // iterate to find the given tuple
                                 List<TupleSpaceEntry> tupleLinkedList = curTupleSpace.get(slotId);
                                 for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
@@ -226,6 +608,9 @@ class ServerWorker implements Runnable {
 
                                     // check if there is a match
                                     if (comparesTuple(curTuple, receivedTuple)) {
+                                        // mark as the tuple is in the slot
+                                        isInSlot = true;
+
                                         // increment the conter in the tuple space entry
                                         tupleSpaceEntry.count += 1;
 
@@ -234,10 +619,59 @@ class ServerWorker implements Runnable {
                                     }
                                 }
 
-                                // HANDLE
-                                // the tuple space contains the hash
-                                // but the tuple is not in the tuple linked list
+                                // the given tuple never in the slot before
+                                if (!isInSlot) {
+                                    // create a new tuple entry
+                                    TupleSpaceEntry tupleSpaceEntry = new TupleSpaceEntry();
+                                    tupleSpaceEntry.count = 1;
+                                    tupleSpaceEntry.tuple = receivedTuple;
+
+                                    tupleLinkedList.add(tupleSpaceEntry);
+                                    System.out.println("Server: new tuple " + receivedMessage.tuple.toString()
+                                        + " in the tuple space with count " + tupleSpaceEntry.count);
+
+                                }
+                            } else {
+                                System.out.println("System error: the given slot is not in the tuple space");
                             }
+
+//                            if (!curTupleSpace.containsKey(slotId)) {
+//                                // the first tuple with the slot id
+//                                // create a new tuple entry
+//                                TupleSpaceEntry tupleSpaceEntry = new TupleSpaceEntry();
+//                                tupleSpaceEntry.count = 1;
+//                                tupleSpaceEntry.tuple = receivedTuple;
+//
+//                                // store the tuple space entry into the new linked list
+//                                List<TupleSpaceEntry> tupleLinkedList = new LinkedList<>();
+//                                tupleLinkedList.add(tupleSpaceEntry);
+//
+//                                // put the tuple linked list into the tuple space
+//                                curTupleSpace.put(slotId, tupleLinkedList);
+//
+//                                System.out.println("Server: new tuple " + receivedMessage.tuple.toString()
+//                                        + " in the tuple space with count " + tupleSpaceEntry.count);
+//                            } else {
+//                                // iterate to find the given tuple
+//                                List<TupleSpaceEntry> tupleLinkedList = curTupleSpace.get(slotId);
+//                                for (TupleSpaceEntry tupleSpaceEntry : tupleLinkedList) {
+//                                    List<Object> curTuple = tupleSpaceEntry.tuple;
+//
+//                                    // check if there is a match
+//                                    if (comparesTuple(curTuple, receivedTuple)) {
+//                                        // increment the conter in the tuple space entry
+//                                        tupleSpaceEntry.count += 1;
+//
+//                                        System.out.println("Server: duplicated tuple " + receivedMessage.tuple.toString()
+//                                                +" with count " + tupleSpaceEntry.count);
+//                                    }
+//                                }
+//
+//
+//                                // HANDLE
+//                                // the tuple space contains the hash
+//                                // but the tuple is not in the tuple linked list
+//                            }
 
                             // update the tupleSpace into the file
                             try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.tupleSpaceDir))) {
@@ -521,6 +955,7 @@ class ServerWorker implements Runnable {
                             if (tupleSpaceEntry.count == 0) {
                                 tupleLinkedList.remove(i);
                                 System.out.println("Server: remove the queried tuple " + curTuple.toString());
+                                System.out.println("Server: the queried tuple with count " + tupleSpaceEntry.count);
                             }
                             return curTuple;
                         }

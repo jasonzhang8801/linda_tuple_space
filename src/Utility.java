@@ -55,7 +55,9 @@ public abstract class Utility {
             switch (commandName.toLowerCase()) {
                 case "add": {
                     // initialize the field: remote host information
-                    parserEntry.remoteHostsInfo = new ArrayList<>();
+                    parserEntry.listOfHostName = new ArrayList<>();
+                    parserEntry.listOfIpAddr = new ArrayList<>();
+                    parserEntry.listOfPortNum = new ArrayList<>();
 
                     // store the valid remote host info into remoteHostInfo
                     // e.g. "hostname, 123.456.78.90, 1234"
@@ -121,10 +123,66 @@ public abstract class Utility {
 //                            if (!matcher.find())
 
                             // add ip and port number
-                            parserEntry.remoteHostsInfo.add(remoteIpAddr);
-                            parserEntry.remoteHostsInfo.add(remotePortNum);
+                            parserEntry.listOfHostName.add(remoteHostName);
+                            parserEntry.listOfIpAddr.add(remoteIpAddr);
+                            parserEntry.listOfPortNum.add(remotePortNum);
                         }
                     }
+                    break;
+                }
+                case "delete": {
+                    // initialize the host information
+                    List<String> listOfHostName = new ArrayList<>();
+
+                    // store the valid remote host name
+                    // e.g. "delete (hostname1, hostname2, hostname3)"
+                    int start_pos = 0;
+                    for (int i = 0; i < withoutCommandSubstr.length(); i++) {
+                        char c = withoutCommandSubstr.charAt(i);
+
+                        if (c == '(') {
+                            start_pos = i;
+                        } else if (c == ')') {
+                            String content = withoutCommandSubstr.substring(start_pos + 1, i);
+
+                            String[] arrOfHostName = content.split(",");
+
+                            for (int j = 0; j < arrOfHostName.length; j++) {
+                                String hostName = arrOfHostName[j].trim();
+
+                                // validate the remote host name
+                                pattern = Pattern.compile("(^[a-zA-Z][a-zA-Z0-9]*)");
+                                matcher = pattern.matcher(hostName);
+
+                                if (matcher.find()) {
+                                    listOfHostName.add(matcher.group(1));
+                                } else {
+                                    System.out.println("Error: invalid host name");
+                                    System.out.println("Help: please review the following host naming convention");
+                                    System.out.println("Host name must start with English letters");
+                                    System.out.println("Host name only contains English letters and numbers");
+                                    System.out.println("Please type command \"help\" to get more details");
+                                    return null;
+                                }
+                            }
+                        }
+                    }
+
+                    Set<String> setOfHostName = new HashSet<>(listOfHostName);
+                    if (setOfHostName.size() != listOfHostName.size()) {
+                        System.out.println("Error: duplicate host name");
+                        System.out.println("Help: please use unique host name");
+                        System.out.println("Please type command \"help\" to get more details");
+                        return null;
+                    }
+
+                    parserEntry.listOfHostName = listOfHostName;
+
+//                    // test only
+//                    for (String hostName : listOfHostName) {
+//                        System.out.println("host name is " + hostName);
+//                    }
+
                     break;
                 }
                 case "out": {
@@ -456,7 +514,7 @@ public abstract class Utility {
     }
 
     /**
-     * get the next host name in the netsMap
+     * get the next host name in the ring
      * @param curHostName
      * @param netsMap
      * @return next host name
@@ -473,6 +531,34 @@ public abstract class Utility {
         int nextHostIndex = (curHostIndex + 1) % netsMap.size();
 
         return netsMapIndexToKey(nextHostIndex, netsMap);
+    }
+
+    /**
+     * get the previous host name in the ring
+     * @param curHostName
+     * @param netsMap
+     * @return previous host name
+     */
+    public static String getPreHostName(String curHostName, LinkedHashMap<String, NetsEntry> netsMap) {
+        if (netsMap == null || curHostName == null) return null;
+
+        int curHostIndex = netsMapKeyToIndex(curHostName, netsMap);
+        if (curHostIndex < 0) {
+            System.out.println("System error: wrong index for host name");
+            return null;
+        }
+
+        int maxHostIndex = netsMap.size() - 1;
+
+        int preHostIndex = -1;
+        if (curHostIndex - 1 < 0) {
+            preHostIndex = maxHostIndex;
+        } else {
+            preHostIndex = curHostIndex - 1;
+        }
+
+        if (preHostIndex < 0) System.out.println("System error: host index should be larger than -1");
+        return netsMapIndexToKey(preHostIndex, netsMap);
     }
 
     /**
@@ -526,7 +612,7 @@ public abstract class Utility {
 //        ParserEntry parserEntry = Utility.parser(in);
 //        System.out.println("command is " + parserEntry.commandName);
 
-        // get next host name
+//        // get next host name
 //        LinkedHashMap<String, NetsEntry> netsMap = new LinkedHashMap<>();
 //        netsMap.put("h1", new NetsEntry());
 //        netsMap.put("h2", new NetsEntry());
@@ -536,6 +622,9 @@ public abstract class Utility {
 //        String curHostName = "h4";
 //        String nextHostName = Utility.getNextHostName(curHostName, netsMap);
 //        System.out.println("cur host name: " + curHostName + " next host name: " + nextHostName);
+//
+//        String preHostName = Utility.getPreHostName(curHostName, netsMap);
+//        System.out.println("cur host name: " + curHostName + " previous host name: " + preHostName);
 
     }
 }
@@ -546,7 +635,9 @@ class ParserEntry {
 
     // for add command
     // store remote host information
-    List<String> remoteHostsInfo = null;
+    List<String> listOfHostName = null;
+    List<String> listOfIpAddr = null;
+    List<String> listOfPortNum = null;
 
     // for non-add command
     // e.g. out, rd, in
@@ -573,9 +664,11 @@ class Message implements Serializable {
 
     // data field
     LinkedHashMap netsMap = null; // store the host information
-    List<Object> tuple = null;
+    List<Object> tuple = null; // tuple
     List<String> LUT = null; // look up table
     Map<String, List<Integer>> RLUT = null; // reversed look up table
+    ConcurrentHashMap<Integer, List<TupleSpaceEntry>> tupleSpace = null; // tuple space
+    List<Integer> listOfSlotId = null; // list of slot id
 
 }
 

@@ -91,25 +91,25 @@ public class P2 {
         String userNameDirStr = "/tmp/szhang/";
         File userNameDir = new File(userNameDirStr);
         if (userNameDir.setReadable(true, false) && userNameDir.setWritable(true, false) && userNameDir.setExecutable(true, false)) {
-            System.out.println("P2: successfully changed the directory " + userNameDir + " to 777");
+            System.out.println("System: successfully changed the directory " + userNameDir + " to 777");
         } else {
-            System.out.println("P2: failed to change the directory " + userNameDir + " to 777");
+            System.out.println("System: failed to change the directory " + userNameDir + " to 777");
         }
 
         // change the linda level directory mode
         String lindaDirStr = "/tmp/szhang/linda/";
         File lindaDir = new File(lindaDirStr);
         if (lindaDir.setReadable(true, false) && lindaDir.setWritable(true, false) && lindaDir.setExecutable(true, false)) {
-            System.out.println("P2: successfully changed the directory " + lindaDirStr + " to 777");
+            System.out.println("System: successfully changed the directory " + lindaDirStr + " to 777");
         } else {
-            System.out.println("P2: failed to change the directory " + lindaDirStr + " to 777");
+            System.out.println("System: failed to change the directory " + lindaDirStr + " to 777");
         }
 
         // change the hostName level directory mode
         if (infoDir.setReadable(true,false) && infoDir.setWritable(true,false) && infoDir.setExecutable(true,false)) {
-            System.out.println("P2: successfully changed the directory " + infoDirStr + " to 777");
+            System.out.println("System: successfully changed the directory " + infoDirStr + " to 777");
         } else {
-            System.out.println("P2: failed to changed the directory " + infoDirStr + " to 777");
+            System.out.println("System: failed to changed the directory " + infoDirStr + " to 777");
         }
 
         // create files
@@ -160,7 +160,7 @@ public class P2 {
                     {
                         // construct the merge message with add
                         Message sendMessage = new Message();
-                        sendMessage.command = "update_port";
+                        sendMessage.command = "replace_nets";
                         sendMessage.success = false;
                         sendMessage.netsMap = P2.netsMap;
 
@@ -173,7 +173,7 @@ public class P2 {
                         Message receivedMessage = null;
                         try {
                             if ((receivedMessage = (Message) in.readObject()) != null) {
-                                if (receivedMessage.command.equals("update_port")  && receivedMessage.success) {
+                                if (receivedMessage.command.equals("replace_nets")  && receivedMessage.success) {
                                     System.out.println("Client: successfully update port number at the host with IP: " + remoteIpAddr
                                             + " port: " + remotePortNum );
                                 } else {
@@ -191,7 +191,9 @@ public class P2 {
                     isCluster = true;
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+//                    e.printStackTrace();
+                    System.out.println("System: failed to connect with the remote host with IP: " + remoteIpAddr
+                            + " port: " + remotePortNum);
                 }
             }
         }
@@ -213,6 +215,7 @@ public class P2 {
 
             // exit linda system
             System.out.println("System: exiting ... ");
+            System.out.println("System: please restart Linda again");
             System.exit(0);
 
         }
@@ -316,10 +319,87 @@ public class P2 {
             p2.updatePort();
 
             // however, tuple space need to be updated
-            // use the local LUT and RLUT to redistribute the tuples
             // ASSUMPTION: during failure, no host join and leave
-            // TODO ...
 
+            // recover the original tuple space from remote backUp host
+            String nextHostName = Utility.getNextHostName(P2.hostName, P2.netsMap);
+            String nextHostIpAddr = P2.netsMap.get(nextHostName).ipAddr;
+            int nextHostPortNum = P2.netsMap.get(nextHostName).portNum;
+
+            try (Socket socket = new Socket(nextHostIpAddr, nextHostPortNum)) {
+
+                try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                     ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream()) ) {
+
+                    // construct the send message
+                    Message sendMessage = new Message();
+                    sendMessage.command = "req_ts";
+                    sendMessage.oriOrBu = Const.BU;
+                    sendMessage.tupleSpace = null;
+                    sendMessage.success = false;
+
+                    objOut.writeObject(sendMessage);
+
+                    // construct the received message
+                    Message receivedMessage = null;
+
+                    if ((receivedMessage = (Message) objIn.readObject()) != null) {
+                        if (receivedMessage.command.equals("req_ts")
+                                && receivedMessage.success
+                                && receivedMessage.tupleSpace != null) {
+                            P2.tupleSpace = receivedMessage.tupleSpace;
+                            System.out.println("System: recover the original tuple space from host with IP "
+                                    + nextHostIpAddr);
+                        } else {
+                            System.out.println("System error: failed to recover the original tuple space from host with IP "
+                                    + nextHostIpAddr);
+                        }
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // recover the backUp tuple space from remote original host
+            String preHostName = Utility.getPreHostName(P2.hostName, P2.netsMap);
+            String preHostIpAddr = P2.netsMap.get(preHostName).ipAddr;
+            int preHostPortNum = P2.netsMap.get(preHostName).portNum;
+
+            try (Socket socket = new Socket(preHostIpAddr, preHostPortNum)) {
+
+                try (ObjectOutputStream objOut = new ObjectOutputStream(socket.getOutputStream());
+                     ObjectInputStream objIn = new ObjectInputStream(socket.getInputStream()) ) {
+
+                    // construct the send message
+                    Message sendMessage = new Message();
+                    sendMessage.command = "req_ts";
+                    sendMessage.oriOrBu = Const.ORI;
+                    sendMessage.tupleSpace = null;
+                    sendMessage.success = false;
+
+                    objOut.writeObject(sendMessage);
+
+                    // construct the received message
+                    Message receivedMessage = null;
+
+                    if ((receivedMessage = (Message) objIn.readObject()) != null) {
+                        if (receivedMessage.command.equals("req_ts")
+                                && receivedMessage.success
+                                && receivedMessage.tupleSpace != null) {
+                            P2.backUpTupleSpace = receivedMessage.tupleSpace;
+                            System.out.println("System: recover the backUp tuple space from host with IP "
+                                    + preHostIpAddr);
+                        } else {
+                            System.out.println("System error: failed to recover the backUp tuple space from host with IP "
+                                    + preHostIpAddr);
+                        }
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
         } else if (P2.netsMap.size() == 1) {
             System.out.println("System: the local host is not in the cluster before");

@@ -58,28 +58,57 @@ public class Client {
                         break;
                     }
                     case "add": {
-                        // construct the list of host with ip and port
-                        List<String> listOfHost = parserEntry.remoteHostsInfo;
 
-                        // num of host
-                        int numOfHost = listOfHost.size() / 2;
-                        if (numOfHost <= 0) {
-                            System.out.println("System error: the number of host should be larger than zero");
-                            System.out.println("Help: please use command \"add\" to add more hosts");
+                        // construct the list of host with ip and port
+                        List<String> listOfRemoteHostName = parserEntry.listOfHostName;
+                        List<String> listOfRemoteIpAddr = parserEntry.listOfIpAddr;
+                        List<String> listOfRemotePortNum = parserEntry.listOfPortNum;
+
+                        // check if the new remote host name exist in the cluster
+                        boolean isDuplicateHostName = false;
+                        Set<String> setOfExistingHostName = P2.netsMap.keySet();
+                        for (String remoteHostName : listOfRemoteHostName) {
+                            if (setOfExistingHostName.contains(remoteHostName)) {
+                                System.out.println("Client: duplicated host name");
+                                System.out.println("Help: please retype the command with unique host name");
+
+                                isDuplicateHostName = true;
+                                break;
+                            }
+                        }
+
+                        if (isDuplicateHostName) {
                             state = "idle";
                             break;
                         }
 
-                        int count = 0;
+                        // num of host
+                        int numOfHost = listOfRemoteHostName.size();
+                        if (numOfHost <= 0) {
+                            System.out.println("System error: the number of host should be larger than zero");
+                            System.out.println("Help: please use command \"add\" to add more hosts");
+
+                            state = "idle";
+                            break;
+                        }
+
+                        // check if there is an existing cluster already
+                        // if it is, jump to internal command, add_internal
+                        if (P2.netsMap.size() > 1) {
+                            state = "add_internal";
+                            break;
+                        }
+
                         // construct the NetsEntry list
                         List<LinkedHashMap<String, NetsEntry>> listOfReceivedNetsMap = new ArrayList<>();
 
                         // collect the netsMap from remote server
                         // check how many netsMap the local server received
                         // set timeout if the local server doesn't receive anything for a given time
-                        while (count <  listOfHost.size()) {
-                            String remoteIpAddr = listOfHost.get(count++);
-                            int remotePortNum = Integer.parseInt(listOfHost.get(count++));
+                        for (int i = 0; i < numOfHost; i++) {
+                            String remoteHostName = listOfRemoteHostName.get(i);
+                            String remoteIpAddr = listOfRemoteIpAddr.get(i);
+                            int remotePortNum = Integer.parseInt(listOfRemotePortNum.get(i));
 
                             try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
                             {
@@ -123,7 +152,6 @@ public class Client {
                                 System.out.println("Help: please check the host IP and port number");
                                 System.exit(0);
                             }
-
                         }
 
                         // merge the local netsMap with netsMap from the remote servers
@@ -154,6 +182,60 @@ public class Client {
 //                                System.out.println("Merged nets");
 //                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
 //                            }
+
+                            // send the message back to remote servers with updated netsMap
+                            for (String hostName : P2.netsMap.keySet()) {
+
+                                // send the message to the remote hosts except current one
+                                if (!hostName.equals(P2.hostName)) {
+                                    String remoteIpAddr = P2.netsMap.get(hostName).ipAddr;
+                                    int remotePortNum = P2.netsMap.get(hostName).portNum;
+
+                                    try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                                    {
+                                        try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                        )
+                                        {
+                                            // construct the replace_nets message with add
+                                            Message sendMessage = new Message();
+                                            sendMessage.command = "replace_nets";
+                                            sendMessage.success = false;
+                                            sendMessage.netsMap = P2.netsMap;
+
+                                            // send the message to remote server
+                                            out.writeObject(sendMessage);
+                                            System.out.println("Client: send back the message with updated nets map to remote host with IP "
+                                                    + remoteIpAddr);
+
+                                            // construct the received object
+                                            Message receivedMessage = null;
+                                            try {
+                                                if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                    if (receivedMessage.command.equals("replace_nets")  && receivedMessage.success) {
+                                                        System.out.println("Client: successfully add the host with IP: " + remoteIpAddr
+                                                                + " port: " + remotePortNum );
+                                                    } else {
+                                                        System.out.println("Error: failed to add host with IP: " + remoteIpAddr
+                                                                + " port: " + remotePortNum );
+                                                    }
+                                                }
+                                            } catch (ClassNotFoundException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            }
+
+                            // update the netsMap into the disk
+                            try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
+                                objOut.writeObject(P2.netsMap);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
 
                             // split LUT and RLUT
                             // number of slot per host
@@ -198,11 +280,11 @@ public class Client {
 //                            }
 
                             // send the message back to remote servers
-                            // including, merged netsMap, updated LUT and updated RLUT
+                            // including updated LUT and updated RLUT
                             for (String hostName : P2.netsMap.keySet()) {
 
                                 // send the message to the remote hosts except current one
-                                if (!hostName.equals(P2.hostName)) {
+//                                if (!hostName.equals(P2.hostName)) {
                                     String remoteIpAddr = P2.netsMap.get(hostName).ipAddr;
                                     int remotePortNum = P2.netsMap.get(hostName).portNum;
 
@@ -214,27 +296,149 @@ public class Client {
                                         {
                                             // construct the merge message with add
                                             Message sendMessage = new Message();
-                                            sendMessage.command = "merge";
+                                            sendMessage.command = "replace_luts_init";
                                             sendMessage.success = false;
-                                            sendMessage.netsMap = P2.netsMap;
                                             sendMessage.LUT = P2.LUT;
                                             sendMessage.RLUT = P2.RLUT;
 
                                             // send the message to remote server
                                             out.writeObject(sendMessage);
-                                            System.out.println("Client: send back the message with updated nets map to remote host with IP "
+                                            System.out.println("Client: send the message with "
+                                                    + "updated look up table and reversed look up table to remote host with IP "
                                                     + remoteIpAddr);
 
                                             // construct the received object
                                             Message receivedMessage = null;
                                             try {
                                                 if ((receivedMessage = (Message) in.readObject()) != null) {
-                                                    if (receivedMessage.command.equals("merge")  && receivedMessage.success) {
-                                                        System.out.println("Client: successfully add the host with IP: " + remoteIpAddr
+                                                    if (receivedMessage.command.equals("replace_luts_init")  && receivedMessage.success) {
+                                                        System.out.println("Client: successfully update look up table at the host with IP: " + remoteIpAddr
                                                                 + " port: " + remotePortNum );
                                                     } else {
-                                                        System.out.println("Error: failed to add host with IP: " + remoteIpAddr
+                                                        System.out.println("Error: failed to update look up table at host with IP: " + remoteIpAddr
                                                                 + " port: " + remotePortNum );
+                                                    }
+                                                }
+                                            } catch (ClassNotFoundException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+//                                }
+                            }
+
+
+                        }
+                        state = "idle";
+                        break;
+                    }
+                    case "add_internal": {
+                        // after forming a cluster, the user use command ADD to add more hosts into the cluster
+                        System.out.println("Client: add new hosts to the existing cluster");
+
+                        // construct the list of host with ip and port
+                        List<String> listOfRemoteIpAddr = parserEntry.listOfIpAddr;
+                        List<String> listOfRemotePortNum = parserEntry.listOfPortNum;
+
+                        // forward the command add_internal to the new host which will be added into the cluster
+                        // allow the new host to redistribute tuples
+                        for (int i = 0; i < listOfRemoteIpAddr.size(); i++) {
+
+                            String remoteIpAddr = listOfRemoteIpAddr.get(i);
+                            int remotePortNum = Integer.parseInt(listOfRemotePortNum.get(i));
+
+                            // request remote host's netsMap
+                            LinkedHashMap<String, NetsEntry> remoteNetsMap = null;
+                            try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                            {
+                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                )
+                                {
+                                    // construct the send message with add
+                                    Message sendMessage = new Message();
+                                    sendMessage.command = "add";
+                                    sendMessage.success = false;
+                                    sendMessage.netsMap = null;
+
+                                    // send the message to remote server
+                                    out.writeObject(sendMessage);
+                                    System.out.println("Client: send the message with command add to the remote host with IP "
+                                            + remoteIpAddr);
+
+                                    // construct the received object
+                                    Message receivedMessage = null;
+
+                                    try {
+                                        if ((receivedMessage = (Message) in.readObject()) != null) {
+                                            remoteNetsMap = receivedMessage.netsMap;
+                                            if (receivedMessage.command.equals("add") && receivedMessage.success) {
+                                                System.out.println("Client: received message with nets map from the remote host "
+                                                        + remoteIpAddr);
+                                            } else {
+                                                System.out.println("Error: remote server failed to send back its nets information");
+                                            }
+                                        }
+                                    } catch (ClassNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            } catch (Exception e) {
+//                                e.printStackTrace();
+                                System.out.println("Client: invalid IP or port number");
+                                System.out.println("Help: please check the host IP and port number");
+                                System.exit(0);
+                            }
+
+                            // merge the remote host's netsMap into the cluster
+                            // not assign ID
+                            // K: hostName, V: netsEntry
+                            String remoteHostName = Utility.netsMapIndexToKey(0, remoteNetsMap);
+                            if (P2.netsMap.containsKey(remoteHostName)) {
+                                System.out.println("Error: host name should be unique");
+                                System.out.println("Help: please exit and rename duplicated host");
+                                System.exit(0);
+                            }
+                            P2.netsMap.put(remoteHostName, remoteNetsMap.get(remoteHostName));
+                            System.out.println("Client: successfully merge the nets map");
+
+                            // send the message back to remote servers with updated netsMap
+                            for (String hostName : P2.netsMap.keySet()) {
+
+                                // send the message to the remote hosts except the local host
+                                if (!hostName.equals(P2.hostName)) {
+                                    String remoteIpAddrMerge = P2.netsMap.get(hostName).ipAddr;
+                                    int remotePortNumMerge = P2.netsMap.get(hostName).portNum;
+
+                                    try (Socket socket = new Socket(remoteIpAddrMerge, remotePortNumMerge);)
+                                    {
+                                        try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                        )
+                                        {
+                                            // construct the replace_nets message with add
+                                            Message sendMessage = new Message();
+                                            sendMessage.command = "replace_nets";
+                                            sendMessage.success = false;
+                                            sendMessage.netsMap = P2.netsMap;
+
+                                            // send the message to remote server
+                                            out.writeObject(sendMessage);
+                                            System.out.println("Client: send back the message with updated nets map to remote host with IP "
+                                                    + remoteIpAddrMerge);
+
+                                            // construct the received object
+                                            Message receivedMessage = null;
+                                            try {
+                                                if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                    if (receivedMessage.command.equals("replace_nets")  && receivedMessage.success) {
+                                                        System.out.println("Client: successfully add the host with IP: " + remoteIpAddrMerge
+                                                                + " port: " + remotePortNumMerge );
+                                                    } else {
+                                                        System.out.println("Error: failed to add host with IP: " + remoteIpAddrMerge
+                                                                + " port: " + remotePortNumMerge );
                                                     }
                                                 }
                                             } catch (ClassNotFoundException e) {
@@ -247,13 +451,60 @@ public class Client {
                                 }
                             }
 
-                            // update the netsMap into the file
+                            // update the netsMap into the disk
                             try (ObjectOutputStream objOut = new ObjectOutputStream(new FileOutputStream(P2.netsMapDir))) {
                                 objOut.writeObject(P2.netsMap);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
+
+
+                            // send the system command add_internal to the new host which will be added into the cluster
+                            try (Socket socket = new Socket(remoteIpAddr, remotePortNum);)
+                            {
+                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                )
+                                {
+                                    // construct the send message with add
+                                    Message sendMessage = new Message();
+                                    sendMessage.command = "add_internal";
+                                    sendMessage.success = false;
+                                    sendMessage.LUT = P2.LUT;
+                                    sendMessage.RLUT = P2.RLUT;
+
+                                    // send the message to remote server
+                                    out.writeObject(sendMessage);
+                                    System.out.println("Client: send the message with command add_internal to the remote host with IP "
+                                            + remoteIpAddr);
+
+                                    // construct the received object
+                                    Message receivedMessage = null;
+
+                                    try {
+                                        if ((receivedMessage = (Message) in.readObject()) != null) {
+
+                                            if (receivedMessage.command.equals("add_internal") && receivedMessage.success) {
+                                                System.out.println("Client: successfully redistribute tuples into new host with IP "
+                                                        + remoteIpAddr);
+                                            } else {
+                                                System.out.println("Error: failed to redistribute tuples into new host with IP "
+                                                + remoteIpAddr);
+                                            }
+                                        }
+                                    } catch (ClassNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            } catch (Exception e) {
+//                                e.printStackTrace();
+                                System.out.println("Client: invalid IP or port number during redistributing tuples");
+                                System.out.println("Help: please check the host IP and port number");
+                                System.exit(0);
+                            }
+
                         }
+
                         state = "idle";
                         break;
                     }
@@ -701,9 +952,49 @@ public class Client {
                         state = "idle";
                         break;
                     }
-                    case "exit": {
-                        System.out.println("Exit linda!");
-                        System.exit(0);
+                    case "delete": {
+                        // delete the host one after another
+                        // forward the cmd delete to the host which will be deleted
+                        List<String> listOfHostName = parserEntry.listOfHostName;
+
+                        // check if the list of host name is empty
+                        if (listOfHostName == null || listOfHostName.size() == 0) {
+                            System.out.println("Client: not delete any host according to the command");
+                            System.out.println("Help: please retype the command again");
+                            state = "idle";
+                        }
+
+                        // check if each remote host is in the existing cluter
+                        Set<String> setOfExistingHostName = P2.netsMap.keySet();
+                        for (String hostName : listOfHostName) {
+                            if (!setOfExistingHostName.contains(hostName)) {
+                                System.out.println("Client: not allow to delete the host which is not in the cluster");
+                                System.out.println("Help: please retype the command again");
+                                state = "idle";
+                                break;
+                            }
+                        }
+
+                        // if the first host which will be deleted is the local host, delete it at last
+                        if (listOfHostName.get(0).equals(P2.hostName)) {
+                            listOfHostName.remove(0);
+                            listOfHostName.add(P2.hostName);
+                        }
+
+
+                        for (String hostName : listOfHostName) {
+                            System.out.println("Client: delete host with " + hostName);
+
+
+                        }
+
+
+
+
+
+
+
+                        state = "idle";
                         break;
                     }
                     default: {
