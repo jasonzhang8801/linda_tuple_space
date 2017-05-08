@@ -175,14 +175,6 @@ public class Client {
 
                             System.out.println("Client: successfully merge the nets map");
 
-                            // test only
-                            // print out the nets map
-//                            int hostId = 0;
-//                            for (String hostName : P2.netsMap.keySet()) {
-//                                System.out.println("Merged nets");
-//                                System.out.println(" hostName: " + hostName + " hostId: " + hostId++);
-//                            }
-
                             // send the message back to remote servers with updated netsMap
                             for (String hostName : P2.netsMap.keySet()) {
 
@@ -269,15 +261,6 @@ public class Client {
                                 }
                             }
                             System.out.println("Client: successfully reallocate the slot to look up table and reversed look up table");
-
-                            // test only
-//                            for (String hostName : P2.RLUT.keySet()) {
-//                                List<Integer> subListOfSlot = P2.RLUT.get(hostName);
-//                                System.out.println("host name " + hostName);
-//                                for (int i : subListOfSlot) {
-//                                    System.out.print(i + " ");
-//                                }
-//                            }
 
                             // send the message back to remote servers
                             // including updated LUT and updated RLUT
@@ -976,19 +959,115 @@ public class Client {
                         }
 
                         // if the first host which will be deleted is the local host, delete it at last
-                        if (listOfHostName.get(0).equals(P2.hostName)) {
+                        if (listOfHostName.get(0).equals(P2.hostName) && listOfHostName.size() > 1) {
                             listOfHostName.remove(0);
                             listOfHostName.add(P2.hostName);
+                            System.out.println("Client: the system will delete the host with IP "
+                                    + P2.ipAddr + " at the last");
                         }
 
 
-                        for (String hostName : listOfHostName) {
-                            System.out.println("Client: delete host with " + hostName);
+                        for (String delHostName : listOfHostName) {
+                            System.out.println("Client: will delete host with " + delHostName);
 
+                            NetsEntry delHostNetsEntry = P2.netsMap.get(delHostName);
+                            String delHostIpAddr = delHostNetsEntry.ipAddr;
+                            int delHostPortNum = delHostNetsEntry.portNum;
 
+                            // remove the host which will be deleted from the netsMap
+                            P2.netsMap.remove(delHostName);
+                            System.out.println("Client: remove the host with IP "
+                                    + delHostIpAddr + " from the nets map");
+
+                            // send the message back to remote servers with updated netsMap
+                            for (String hostName : P2.netsMap.keySet()) {
+
+                                // send the message to the remote hosts except the local host
+                                if (!hostName.equals(P2.hostName)) {
+                                    String remoteIpAddrMerge = P2.netsMap.get(hostName).ipAddr;
+                                    int remotePortNumMerge = P2.netsMap.get(hostName).portNum;
+
+                                    try (Socket socket = new Socket(remoteIpAddrMerge, remotePortNumMerge);) {
+                                        try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                        ) {
+                                            // construct the replace_nets message with add
+                                            Message sendMessage = new Message();
+                                            sendMessage.command = "replace_nets";
+                                            sendMessage.success = false;
+                                            sendMessage.netsMap = P2.netsMap;
+
+                                            // send the message to remote server
+                                            out.writeObject(sendMessage);
+                                            System.out.println("Client: send back the message with updated nets map to remote host with IP "
+                                                    + remoteIpAddrMerge);
+
+                                            // construct the received object
+                                            Message receivedMessage = null;
+                                            try {
+                                                if ((receivedMessage = (Message) in.readObject()) != null) {
+                                                    if (receivedMessage.command.equals("replace_nets") && receivedMessage.success) {
+                                                        System.out.println("Client: successfully add the host with IP: " + remoteIpAddrMerge
+                                                                + " port: " + remotePortNumMerge);
+                                                    } else {
+                                                        System.out.println("Error: failed to add host with IP: " + remoteIpAddrMerge
+                                                                + " port: " + remotePortNumMerge);
+                                                    }
+                                                }
+                                            } catch (ClassNotFoundException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            }
+
+                            // forward the delete message to the remote host
+
+                            try (Socket socket = new Socket(delHostIpAddr, delHostPortNum);)
+                            {
+                                try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                                )
+                                {
+                                    // construct the send message with add
+                                    Message sendMessage = new Message();
+                                    sendMessage.command = "delete";
+                                    sendMessage.success = false;
+                                    sendMessage.hostName = delHostName;
+                                    sendMessage.netsMap = P2.netsMap;
+
+                                    // send the message to remote server
+                                    out.writeObject(sendMessage);
+                                    System.out.println("Client: send the message with command delete to the remote host with IP "
+                                            + delHostIpAddr);
+
+                                    // construct the received object
+                                    Message receivedMessage = null;
+
+                                    try {
+                                        if ((receivedMessage = (Message) in.readObject()) != null) {
+
+                                            if (receivedMessage.command.equals("delete") && receivedMessage.success) {
+                                                System.out.println("Client: successfully delete host with IP "
+                                                        + delHostIpAddr);
+                                            } else {
+                                                System.out.println("Error: failed to delete host with IP "
+                                                        + delHostIpAddr);
+                                            }
+                                        }
+                                    } catch (ClassNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                System.out.println("Client: invalid IP or port number during deleting hosts");
+                                System.out.println("Help: please check the host IP and port number");
+                            }
                         }
-
-
 
 
 

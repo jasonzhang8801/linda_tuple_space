@@ -1,5 +1,4 @@
 Name: Sen Zhang
-ID: 00001185749
 Email: szhang1@scu.edu
 
 Please use the following linux command on terminal

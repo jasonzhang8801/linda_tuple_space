@@ -296,12 +296,6 @@ public abstract class Utility {
                             }
                         }
 
-//                        // test only
-//                        for (Object obj : parserEntry.tuple) {
-//                            String className = obj.getClass().getName().split("\\.")[2];
-//                            System.out.println("class name is " + className);
-//                            System.out.println("component is " + obj.toString());
-//                        }
                     }
                     break;
                 }
@@ -659,6 +653,7 @@ class Message implements Serializable {
     Const oriOrBu = null; // indicate if the tuple should put into the original tuple space or backUp tuple space
 
     // network information
+    String hostName = null;
     String ipAddr = null;
     int portNum;
 
